@@ -30,8 +30,10 @@ struct DetailView: View {
 }
 
 struct DetailHeader: View {
+    @EnvironmentObject var store: SessionStore
     let session: DeckSession
     let unread: Bool
+    private var branch: String? { store.branches[session.id] }
     /// Without the sidebar the traffic lights sit above the header → leave room for them.
     var sidebarHidden = false
     var toggleSidebar: () -> Void = {}
@@ -56,7 +58,15 @@ struct DetailHeader: View {
                         Text(session.area)
                     }
                     Text(verbatim: "·").foregroundStyle(.tertiary)
-                    Text(session.tool)
+                    ToolBadge(tool: session.tool, size: 11.5)
+                    if let branch = branch {
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.triangle.branch").font(.system(size: 10))
+                            Text(verbatim: branch)
+                        }
+                        .help(String(localized: "Git branch"))
+                    }
                     Text(verbatim: "·").foregroundStyle(.tertiary)
                     Text(session.shortPath)
                         .font(.system(size: 11, design: .monospaced))

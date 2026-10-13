@@ -42,7 +42,8 @@ is kept alive, so switching is instant and scrollback survives.
 - Dock badge and menu bar extra count only new sessions; the menu bar lists New / Working / Recently Active
 - Remote sessions (agent-deck remotes, e.g. `build-server`) show a network glyph; polled every 10 s over SSH
 - In “Areas”, drag local sessions into another group (`agent-deck group move`); empty groups stay visible as targets
-- Header: title, area, tool, path, status pill, reveal folder, copy attach command, reconnect
+- Each row shows the harness (Claude, Codex, Gemini, …) with its own glyph; the header adds the git branch
+- Header: title, area, tool, branch, path, status pill, reveal folder, copy attach command, reconnect
 - Terminal with a muted palette and padding; if the connection drops you get a “No Connection” state
   instead of a reconnect loop
 - Keys: ⌘K jump to (floating search, also matches folders), ⌘J next new session, ⌘1–⌘9 direct

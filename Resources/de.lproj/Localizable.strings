@@ -60,3 +60,6 @@
 "Moving to “%@” failed" = "Verschieben nach „%@“ fehlgeschlagen";
 "agent-deck is not responding" = "agent-deck antwortet nicht";
 "Could not read agent-deck output" = "Antwort von agent-deck nicht lesbar";
+
+/* Header */
+"Git branch" = "Git-Branch";

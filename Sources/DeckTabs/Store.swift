@@ -149,6 +149,24 @@ final class SessionStore: ObservableObject {
     var conductors: [DeckSession] { sessions.filter(\.isConductor) }
     var others: [DeckSession] { sessions.filter { !$0.isConductor } }
 
+    /// Current git branch per local session (refreshed every 10 s).
+    @Published private(set) var branches: [String: String] = [:]
+
+    func refreshBranches() {
+        let local = sessions.filter { !$0.isRemote }.map { ($0.id, $0.path) }
+        Task.detached {
+            var result: [String: String] = [:]
+            for (id, path) in local {
+                guard let data = Tools.run("/usr/bin/git", ["-C", path, "branch", "--show-current"]),
+                      let b = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !b.isEmpty else { continue }
+                result[id] = b
+            }
+            let found = result
+            await MainActor.run { if found != self.branches { self.branches = found } }
+        }
+    }
+
     /// All local agent-deck groups, including empty ones (drop targets).
     @Published private(set) var knownGroups: [String] = []
 
@@ -222,6 +240,8 @@ final class SessionStore: ObservableObject {
             selectedID = sessions.first { $0.title == "api-gateway" }?.id
             loaded = true
             NSApp.dockTile.badgeLabel = "\(unreadCount)"
+            branches = Dictionary(uniqueKeysWithValues: sessions.filter { !$0.isRemote }.map { ($0.id, "main") })
+            branches[sessions.first { $0.title == "api-gateway" }?.id ?? ""] = "feat/rate-limit"
             return
         }
         refresh()
@@ -230,10 +250,12 @@ final class SessionStore: ObservableObject {
         }
         refreshRemotes()
         refreshGroups()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refreshBranches() }
         remoteTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshRemotes()
                 self?.refreshGroups()
+                self?.refreshBranches()
             }
         }
     }

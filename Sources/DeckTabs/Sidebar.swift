@@ -165,6 +165,8 @@ struct SessionRow: View {
                     .font(.system(size: 13, weight: unread ? .semibold : .regular))
                     .lineLimit(1)
                 HStack(spacing: 5) {
+                    ToolBadge(tool: session.tool)
+                    Text(verbatim: "·").foregroundStyle(.tertiary)
                     if session.isRemote {
                         Image(systemName: "network").font(.system(size: 9))
                         Text(showGroup ? session.area : session.path)

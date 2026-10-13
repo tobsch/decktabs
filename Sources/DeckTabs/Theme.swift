@@ -93,3 +93,47 @@ func statusText(_ s: DeckSession, unread: Bool) -> String {
     default: return s.status
     }
 }
+
+/// Harness of a session (Claude Code, Codex, …) with a recognizable glyph and color.
+struct ToolInfo {
+    let name: String
+    let symbol: String
+    let color: SwiftUI.Color
+
+    init(_ tool: String) {
+        switch tool.lowercased() {
+        case "claude":
+            name = "Claude"; symbol = "asterisk"; color = SwiftUI.Color(red: 0.85, green: 0.47, blue: 0.34)
+        case "codex":
+            name = "Codex"; symbol = "chevron.left.forwardslash.chevron.right"; color = SwiftUI.Color(red: 0.35, green: 0.62, blue: 0.95)
+        case "gemini":
+            name = "Gemini"; symbol = "sparkle"; color = SwiftUI.Color(red: 0.40, green: 0.55, blue: 0.98)
+        case "opencode":
+            name = "OpenCode"; symbol = "curlybraces"; color = SwiftUI.Color(red: 0.55, green: 0.75, blue: 0.45)
+        case "cursor":
+            name = "Cursor"; symbol = "cursorarrow.rays"; color = SwiftUI.Color(red: 0.70, green: 0.70, blue: 0.75)
+        case "hermes":
+            name = "Hermes"; symbol = "bolt.fill"; color = SwiftUI.Color(red: 0.85, green: 0.70, blue: 0.30)
+        default:
+            name = tool.isEmpty ? "Shell" : tool.prefix(1).uppercased() + tool.dropFirst()
+            symbol = "terminal"; color = .secondary
+        }
+    }
+}
+
+/// Small tool label: colored glyph + name.
+struct ToolBadge: View {
+    let tool: String
+    var size: CGFloat = 11
+
+    var body: some View {
+        let info = ToolInfo(tool)
+        HStack(spacing: 3) {
+            Image(systemName: info.symbol)
+                .font(.system(size: size - 1, weight: .bold))
+                .foregroundStyle(info.color)
+            Text(verbatim: info.name)
+        }
+        .help(info.name)
+    }
+}
