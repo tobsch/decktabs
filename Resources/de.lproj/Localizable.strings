@@ -1,0 +1,62 @@
+/* German translations for DeckTabs. Keys are the English source strings. */
+
+/* Menus */
+"Jump to…" = "Springen zu …";
+"Next New Session" = "Nächste neue Session";
+"Next" = "Nächste";
+"Previous" = "Vorherige";
+"Session %lld" = "Session %lld";
+"By Activity" = "Nach Aktivität";
+"By Area" = "Nach Bereich";
+"Toggle Sidebar" = "Seitenleiste ein-/ausblenden";
+"Reconnect Terminal" = "Terminal neu verbinden";
+
+/* Menu bar extra */
+"New" = "Neu";
+"Working" = "Arbeitet";
+"Recently Active" = "Zuletzt aktiv";
+"Open Agent Deck" = "Agent Deck öffnen";
+"Quit" = "Beenden";
+
+/* Sidebar */
+"Today" = "Heute";
+"Yesterday" = "Gestern";
+"This Week" = "Diese Woche";
+"Earlier" = "Früher";
+"Activity" = "Aktivität";
+"Areas" = "Bereiche";
+"Drop here" = "Hierher ziehen";
+"Toggle sidebar (⌃⌘S)" = "Seitenleiste ein-/ausblenden (⌃⌘S)";
+
+/* Detail */
+"No Sessions" = "Keine Sessions";
+"Start a session with agent-deck and it shows up here automatically." = "Starte eine Session mit agent-deck, sie erscheint hier automatisch.";
+"Show folder in Finder" = "Ordner im Finder zeigen";
+"Copy attach command" = "attach-Befehl kopieren";
+"Reconnect terminal" = "Terminal neu verbinden";
+"No Connection" = "Keine Verbindung";
+"“%@” on %@ is not reachable right now. Is the machine on?" = "„%@“ auf %@ ist gerade nicht erreichbar. Ist der Rechner an?";
+"tmux session “%@” is not reachable right now. Is it still running?" = "tmux-Session „%@“ ist gerade nicht erreichbar. Läuft sie noch?";
+"Reconnect" = "Neu verbinden";
+"Session, area or folder" = "Session, Bereich oder Ordner";
+
+/* Status */
+"error" = "Fehler";
+"working" = "arbeitet";
+"new – waiting for you" = "neu – wartet auf dich";
+"ready" = "bereit";
+"idle" = "ruht";
+"stopped" = "gestoppt";
+
+/* Relative times */
+"now" = "jetzt";
+"%lld min" = "%lld Min.";
+"%lld h" = "%lld Std.";
+"yesterday" = "gestern";
+"%lld d" = "%lld T.";
+"%lld w" = "%lld Wo.";
+
+/* Errors */
+"Moving to “%@” failed" = "Verschieben nach „%@“ fehlgeschlagen";
+"agent-deck is not responding" = "agent-deck antwortet nicht";
+"Could not read agent-deck output" = "Antwort von agent-deck nicht lesbar";
