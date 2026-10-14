@@ -163,6 +163,10 @@ private struct InboxCard: View {
                             }
                             .help(String(localized: "Open “\(subject.title)”"))
                         }
+                        if approvable {
+                            CardAction(symbol: "xmark") { store.ack(item, conductor: conductor) }
+                                .help(String(localized: "Dismiss – nothing gets passed on"))
+                        }
                         if !conductor.isRemote {
                             CardAction(symbol: "arrowshape.turn.up.left", active: replying) {
                                 withAnimation(.snappy(duration: 0.2)) { replying.toggle() }
@@ -173,15 +177,17 @@ private struct InboxCard: View {
                     }
                     .font(.system(size: 11))
                 }
-                Button { store.ack(item, conductor: conductor) } label: {
+                Button { approvable ? approve() : store.ack(item, conductor: conductor) } label: {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 24, height: 24)
-                        .foregroundStyle(hover ? Color.white : Color.secondary)
-                        .background(Circle().fill(Color.white.opacity(hover ? 0.14 : 0.06)))
+                        .foregroundStyle(hover ? Color.white : approvable ? Color.orange : Color.secondary)
+                        .background(Circle().fill((approvable ? Color.orange : Color.white).opacity(hover ? 0.24 : 0.1)))
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "Mark as read – nothing gets passed on"))
+                .disabled(sending)
+                .help(approvable ? String(localized: "OK – do it as suggested (the conductor passes it on)")
+                                 : String(localized: "Mark as read"))
             }
             if replying {
                 HStack(alignment: .bottom, spacing: 6) {
@@ -217,19 +223,35 @@ private struct InboxCard: View {
         .onHover { hover = $0 }
     }
 
+    /// Urgent items ask for a decision: the checkmark approves the conductor's suggestion.
+    private var approvable: Bool { item.isUrgent && !conductor.isRemote }
+
     /// Sends the answer to the conductor with the original item quoted, then marks the item done.
     private func send() {
         let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !sending else { return }
+        deliver("Antwort von Tobi auf deine Meldung „\(item.text ?? "")“:\n\(text)\n\n"
+            + "Bitte an die betroffene Session weitergeben und Bescheid geben, wenn erledigt.") {
+            reply = ""
+            replying = false
+        }
+    }
+
+    /// "OK" on an escalation: do what the conductor suggested.
+    private func approve() {
+        deliver("Tobi hat deine Meldung „\(item.text ?? "")“ abgehakt: OK, so machen wie von dir vorgeschlagen "
+            + "(bei Ja/Nein-Fragen: ja). Bitte an die betroffene Session weitergeben und Bescheid geben, wenn erledigt. "
+            + "Ist der Vorschlag nicht eindeutig, frag kurz nach statt zu raten.")
+    }
+
+    private func deliver(_ message: String, then done: @escaping () -> Void = {}) {
+        guard !sending else { return }
         sending = true
-        let message = "Antwort von Tobi auf deine Meldung „\(item.text ?? "")“:\n\(text)\n\n"
-            + "Bitte an die betroffene Session weitergeben und Bescheid geben, wenn erledigt."
         Task {
             let ok = await store.send(message, to: conductor)
             sending = false
             if ok {
-                reply = ""
-                replying = false
+                done()
                 store.ack(item, conductor: conductor)
             } else {
                 store.lastError = String(localized: "Could not send the message")

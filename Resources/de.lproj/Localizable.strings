@@ -133,6 +133,8 @@
 "Reply" = "Antworten";
 "Open the session" = "Session öffnen";
 "Answer via the conductor – it passes your answer on" = "Über den Conductor antworten – er gibt deine Antwort weiter";
-"Mark as read – nothing gets passed on" = "Als gelesen markieren – es wird nichts weitergegeben";
+"Dismiss – nothing gets passed on" = "Verwerfen – es wird nichts weitergegeben";
+"OK – do it as suggested (the conductor passes it on)" = "OK – so machen wie vorgeschlagen (der Conductor gibt es weiter)";
+"Mark as read" = "Als gelesen markieren";
 "Your answer…" = "Deine Antwort …";
 "Open “%@”" = "„%@“ öffnen";
