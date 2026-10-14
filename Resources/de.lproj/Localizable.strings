@@ -63,3 +63,22 @@
 
 /* Header */
 "Git branch" = "Git-Branch";
+
+/* Conductors */
+"Inbox" = "Eingang";
+"Workers" = "Worker";
+"Nothing for you right now." = "Gerade nichts für dich.";
+"Sessions this conductor starts show up here." = "Sessions, die dieser Conductor startet, erscheinen hier.";
+"Heartbeat on" = "Heartbeat an";
+"Heartbeat off" = "Heartbeat aus";
+"Last activity of its workers" = "Letzte Aktivität seiner Worker";
+"Urgent" = "Dringend";
+"Info" = "Info";
+"Done – remove from the inbox" = "Erledigt – aus dem Eingang nehmen";
+"Message %@…" = "Nachricht an %@ …";
+"Send (↩)" = "Senden (↩)";
+"Could not send the message" = "Nachricht konnte nicht gesendet werden";
+"Could not mark the item as done" = "Konnte nicht als erledigt markiert werden";
+"Items in the conductor's inbox" = "Einträge im Eingang des Conductors";
+"Show or hide the conductor panel" = "Conductor-Leiste ein- oder ausblenden";
+"Conductor %@" = "Conductor %@";

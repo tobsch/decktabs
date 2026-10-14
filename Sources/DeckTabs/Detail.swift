@@ -6,6 +6,7 @@ struct DetailView: View {
     @ObservedObject var pool = TerminalPool.shared
     var sidebarHidden = false
     var toggleSidebar: () -> Void = {}
+    @AppStorage("conductorPanel") private var showPanel = true
 
     var body: some View {
         ZStack {
@@ -14,10 +15,18 @@ struct DetailView: View {
                 VStack(spacing: 0) {
                     DetailHeader(session: s, unread: store.isUnread(s), sidebarHidden: sidebarHidden, toggleSidebar: toggleSidebar)
                     Rectangle().fill(Theme.canvasLine).frame(height: 1)
-                    if pool.failed.contains(s.id) {
-                        Disconnected(session: s)
-                    } else {
-                        TerminalContainer(session: s, revision: pool.revision)
+                    HStack(spacing: 0) {
+                        if pool.failed.contains(s.id) {
+                            Disconnected(session: s)
+                        } else {
+                            TerminalContainer(session: s, revision: pool.revision)
+                        }
+                        if store.isConductor(s) && showPanel {
+                            Rectangle().fill(Theme.canvasLine).frame(width: 1)
+                            ConductorPanel(conductor: s)
+                                .frame(width: 310)
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
                     }
                 }
             } else if store.loaded {
@@ -34,6 +43,7 @@ struct DetailHeader: View {
     let session: DeckSession
     let unread: Bool
     private var branch: String? { store.branches[session.id] }
+    @AppStorage("conductorPanel") private var showPanel = true
     /// Without the sidebar the traffic lights sit above the header → leave room for them.
     var sidebarHidden = false
     var toggleSidebar: () -> Void = {}
@@ -89,6 +99,11 @@ struct DetailHeader: View {
                 }
                 HeaderButton(symbol: "arrow.clockwise", help: String(localized: "Reconnect terminal")) {
                     TerminalPool.shared.reconnect(session.id)
+                }
+                if store.isConductor(session) {
+                    HeaderButton(symbol: "sidebar.right", help: String(localized: "Show or hide the conductor panel")) {
+                        withAnimation(.snappy(duration: 0.25)) { showPanel.toggle() }
+                    }
                 }
             }
         }

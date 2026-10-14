@@ -142,14 +142,23 @@ final class SessionStore: ObservableObject {
     private var localSessions: [DeckSession]?
 
     init() {
+        defer { Self.current = self }
         mode = SidebarMode(rawValue: UserDefaults.standard.string(forKey: "sidebarMode") ?? "") ?? .activity
         let raw = UserDefaults.standard.dictionary(forKey: "lastSeen") as? [String: Double] ?? [:]
         lastSeen = raw.mapValues { Date(timeIntervalSince1970: $0) }
         selectedID = UserDefaults.standard.string(forKey: "selectedID")
     }
 
-    var conductors: [DeckSession] { sessions.filter(\.isConductor) }
-    var others: [DeckSession] { sessions.filter { !$0.isConductor } }
+    var conductors: [DeckSession] { sessions.filter(isConductor) }
+    /// Sessions in the time buckets: everything except conductors and the workers nested under them.
+    var others: [DeckSession] { sessions.filter { !isConductor($0) && conductorAncestor(of: $0) == nil } }
+
+    // Conductor state (see Conductor.swift)
+    @Published var conductorStatus: [String: ConductorStatus] = [:]
+    @Published var outbox: [String: [OutboxItem]] = [:]
+    var notifiedOutbox: Set<String> = []
+    var outboxPrimed = false
+    weak static var current: SessionStore?
 
     /// Current git branch per local session (refreshed every 10 s).
     @Published private(set) var branches: [String: String] = [:]
@@ -173,7 +182,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var knownGroups: [String] = []
 
     var groups: [(name: String, sessions: [DeckSession], isRemote: Bool)] {
-        var byArea = Dictionary(grouping: others, by: \.area)
+        var byArea = Dictionary(grouping: sessions.filter { !isConductor($0) }, by: \.area)
         for g in knownGroups where byArea[g] == nil && !g.lowercased().hasPrefix("conductor") { byArea[g] = [] }
         return byArea
             .map { (name: $0.key, sessions: $0.value, isRemote: $0.value.first?.isRemote ?? false) }
@@ -212,7 +221,8 @@ final class SessionStore: ObservableObject {
 
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
-        mode == .activity ? conductors + others : conductors + groups.flatMap(\.sessions)
+        let top = conductors.flatMap { [$0] + children(of: $0) }
+        return mode == .activity ? top + others : conductors + groups.flatMap(\.sessions)
     }
 
     var unreadCount: Int { sessions.filter(isUnread).count }
@@ -239,9 +249,10 @@ final class SessionStore: ObservableObject {
             sessions = Demo.sessions
             knownGroups = Array(Set(Demo.sessions.filter { !$0.isRemote }.map(\.group))).sorted()
             for s in sessions { lastSeen[s.id] = Demo.seen(s) }
-            selectedID = sessions.first { $0.title == "api-gateway" }?.id
+            selectedID = sessions.first { $0.title == Demo.initialSelection }?.id
             loaded = true
-            NSApp.dockTile.badgeLabel = "\(unreadCount)"
+            Demo.applyConductors(to: self)
+            updateBadge()
             branches = Dictionary(uniqueKeysWithValues: sessions.filter { !$0.isRemote }.map { ($0.id, "main") })
             branches[sessions.first { $0.title == "api-gateway" }?.id ?? ""] = "feat/rate-limit"
             return
@@ -252,12 +263,14 @@ final class SessionStore: ObservableObject {
         }
         refreshRemotes()
         refreshGroups()
+        refreshConductors()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refreshBranches() }
         remoteTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshRemotes()
                 self?.refreshGroups()
                 self?.refreshBranches()
+                self?.refreshConductors()
             }
         }
     }
@@ -325,8 +338,7 @@ final class SessionStore: ObservableObject {
                 selectedID = ordered.first?.id
             }
             UserDefaults.standard.set(selectedID, forKey: "selectedID")
-            let n = unreadCount
-            NSApp.dockTile.badgeLabel = n > 0 ? "\(n)" : nil
+            updateBadge()
         } catch {
             lastError = String(localized: "Could not read agent-deck output")
         }

@@ -38,7 +38,14 @@ struct Sidebar: View {
             TimelineView(.periodic(from: .now, by: 30)) { ctx in
                 List(selection: $store.selectedID) {
                     if !store.conductors.isEmpty {
-                        Section { rows(store.conductors, now: ctx.date, showGroup: true) } header: {
+                        Section {
+                            ForEach(store.conductors) { c in
+                                rows([c], now: ctx.date, showGroup: true)
+                                if store.mode == .activity {
+                                    rows(store.children(of: c), now: ctx.date, showGroup: true, nested: true)
+                                }
+                            }
+                        } header: {
                             SectionTitle("Conductors", symbol: "point.3.connected.trianglepath.dotted")
                         }
                     }
@@ -79,14 +86,19 @@ struct Sidebar: View {
     }
 
     @ViewBuilder
-    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil) -> some View {
+    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil,
+                      nested: Bool = false) -> some View {
         ForEach(list) { s in
+            let inbox = store.pendingOutbox(s)
             SessionRow(
                 session: s,
                 unread: store.isUnread(s),
                 showGroup: showGroup,
                 shortcut: keys.commandHeld ? store.ordered.firstIndex(of: s).flatMap { $0 < 9 ? $0 + 1 : nil } : nil,
-                now: now
+                now: now,
+                inboxCount: inbox.count,
+                inboxUrgent: inbox.contains(where: \.isUrgent),
+                nested: nested
             )
             .tag(s.id)
             .draggableSession(s, enabled: store.mode == .groups)
@@ -156,9 +168,16 @@ struct SessionRow: View {
     let showGroup: Bool
     let shortcut: Int?
     let now: Date
+    var inboxCount = 0
+    var inboxUrgent = false
+    /// Worker of a conductor: indented under it with a tree line.
+    var nested = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
+            if nested {
+                Rectangle().fill(Color.secondary.opacity(0.25)).frame(width: 1).padding(.leading, 6)
+            }
             StatusGlyph(session: session, unread: unread)
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title)
@@ -182,6 +201,14 @@ struct SessionRow: View {
                 .lineLimit(1)
             }
             Spacer(minLength: 4)
+            if inboxCount > 0 {
+                Text(verbatim: "\(inboxCount)")
+                    .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(inboxUrgent ? Color.white : Color.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(Capsule().fill(inboxUrgent ? Color.orange : Color.primary.opacity(0.1)))
+                    .help(String(localized: "Items in the conductor's inbox"))
+            }
             Group {
                 if let shortcut {
                     Text(verbatim: "⌘\(shortcut)")

@@ -5,18 +5,26 @@ enum Demo {
     static let enabled = CommandLine.arguments.contains("--demo")
         || ProcessInfo.processInfo.environment["DECKTABS_DEMO"] == "1"
 
+    /// `--demo-select <title>` picks the session shown first (for screenshots).
+    static var initialSelection: String {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--demo-select"), i + 1 < args.count { return args[i + 1] }
+        return "api-gateway"
+    }
+
     private struct Spec {
         let title, group, tool, status: String
         let minutesAgo: Double
         var remote: String? = nil
         var unread = false
+        var parent: Int? = nil
     }
 
     private static let specs: [Spec] = [
         Spec(title: "conductor-ops", group: "conductor", tool: "claude", status: "waiting", minutesAgo: 3),
-        Spec(title: "api-gateway", group: "backend", tool: "claude", status: "running", minutesAgo: 0),
-        Spec(title: "billing-service", group: "backend", tool: "codex", status: "waiting", minutesAgo: 6, unread: true),
-        Spec(title: "web-dashboard", group: "frontend", tool: "claude", status: "running", minutesAgo: 1),
+        Spec(title: "api-gateway", group: "backend", tool: "claude", status: "running", minutesAgo: 0, parent: 0),
+        Spec(title: "billing-service", group: "backend", tool: "codex", status: "waiting", minutesAgo: 6, unread: true, parent: 0),
+        Spec(title: "web-dashboard", group: "frontend", tool: "claude", status: "running", minutesAgo: 1, parent: 0),
         Spec(title: "design-system", group: "frontend", tool: "claude", status: "waiting", minutesAgo: 24, unread: true),
         Spec(title: "gpu-benchmarks", group: "lab", tool: "claude", status: "waiting", minutesAgo: 52,
              remote: "build-server"),
@@ -28,12 +36,13 @@ enum Demo {
 
     static let sessions: [DeckSession] = specs.enumerated().map { i, s in
         let date = Date().addingTimeInterval(-s.minutesAgo * 60)
-        let json: [String: Any] = [
+        var json: [String: Any] = [
             "id": "demo-\(i)", "title": s.title, "group": s.group, "tool": s.tool, "status": s.status,
             "path": (s.remote != nil ? "/home/dev/" : NSHomeDirectory() + "/code/") + s.title,
             "tmux_session": "agentdeck_\(s.title)",
             "last_activity_at": ISO8601DateFormatter().string(from: date),
         ]
+        if let p = s.parent { json["parent_session_id"] = "demo-\(p)" }
         var session = try! JSONDecoder().decode(DeckSession.self,
                                                 from: JSONSerialization.data(withJSONObject: json))
         if let remote = s.remote {
@@ -41,6 +50,26 @@ enum Demo {
             session.remoteID = session.id
         }
         return session
+    }
+
+    /// The "ops" conductor with a few items in its inbox.
+    @MainActor
+    static func applyConductors(to store: SessionStore) {
+        let ago = { (m: Double) in ISO8601DateFormatter().string(from: Date().addingTimeInterval(-m * 60)) }
+        store.conductorStatus = ["ops": ConductorStatus(
+            name: "ops", agent: "claude", session_id: "demo-0", running: true, heartbeat: true,
+            description: "Keeps the backend and frontend lanes moving", last_activity_at: ago(1))]
+        store.outbox = ["ops": [
+            OutboxItem(id: "o1", ts: ago(4), tier: "urgent",
+                       text: "billing-service needs a decision: migrate the invoices table now or after the release freeze on Friday?",
+                       acked: false),
+            OutboxItem(id: "o2", ts: ago(18), tier: "info",
+                       text: "api-gateway: rate limiting is on feat/rate-limit, all 214 tests green. Opening the PR once you said yes.",
+                       acked: false),
+            OutboxItem(id: "o3", ts: ago(41), tier: "info",
+                       text: "web-dashboard picked up the new design-system tokens; screenshots are in the PR.",
+                       acked: false),
+        ]]
     }
 
     static func seen(_ s: DeckSession) -> Date {
