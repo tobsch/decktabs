@@ -38,7 +38,7 @@ struct ConductorPanel: View {
                                 .padding(.vertical, 4)
                         } else {
                             ForEach(inbox) { item in
-                                InboxCard(item: item) { store.ack(item, conductor: conductor) }
+                                InboxCard(item: item, conductor: conductor)
                                     .transition(.asymmetric(insertion: .opacity,
                                                             removal: .move(edge: .trailing).combined(with: .opacity)))
                             }
@@ -122,40 +122,88 @@ private struct PanelSection<Content: View>: View {
 }
 
 private struct InboxCard: View {
+    @EnvironmentObject var store: SessionStore
     let item: OutboxItem
-    let done: () -> Void
+    let conductor: DeckSession
     @State private var hover = false
+    @State private var replying = false
+    @State private var reply = ""
+    @State private var sending = false
+    @FocusState private var focused: Bool
+
+    /// Worker the item is about ("kaffee: …" → session kaffee).
+    private var subject: DeckSession? {
+        guard let text = item.text, let colon = text.firstIndex(of: ":") else { return nil }
+        let name = text[..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+        return store.sessions.first { $0.title.lowercased() == name }
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: item.isUrgent ? "exclamationmark.circle.fill" : "info.circle")
-                .font(.system(size: 13))
-                .foregroundStyle(item.isUrgent ? Color.orange : Color.secondary)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(verbatim: item.text ?? "")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
-                    Text(item.isUrgent ? String(localized: "Urgent") : String(localized: "Info"))
-                        .foregroundStyle(item.isUrgent ? Color.orange : Color.secondary)
-                    Text(verbatim: "·").foregroundStyle(.tertiary)
-                    Text(Theme.ago(item.date)).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: item.isUrgent ? "exclamationmark.circle.fill" : "info.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(item.isUrgent ? Color.orange : Color.secondary)
+                    .padding(.top, 1)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(verbatim: item.text ?? "")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        Text(item.isUrgent ? String(localized: "Urgent") : String(localized: "Info"))
+                            .foregroundStyle(item.isUrgent ? Color.orange : Color.secondary)
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                        Text(Theme.ago(item.date)).foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        if let subject {
+                            CardAction(symbol: "arrow.up.forward.square", title: subject.title) {
+                                store.selectedID = subject.id
+                            }
+                            .help(String(localized: "Open the session"))
+                        }
+                        if !conductor.isRemote {
+                            CardAction(symbol: "arrowshape.turn.up.left", title: String(localized: "Reply")) {
+                                withAnimation(.snappy(duration: 0.2)) { replying.toggle() }
+                                focused = replying
+                            }
+                            .help(String(localized: "Answer via the conductor – it passes your answer on"))
+                        }
+                    }
+                    .font(.system(size: 11))
                 }
-                .font(.system(size: 11))
+                Button { store.ack(item, conductor: conductor) } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(hover ? Color.white : Color.secondary)
+                        .background(Circle().fill(Color.white.opacity(hover ? 0.14 : 0.06)))
+                }
+                .buttonStyle(.plain)
+                .help(String(localized: "Mark as read – nothing gets passed on"))
             }
-            Spacer(minLength: 0)
-            Button(action: done) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(hover ? Color.white : Color.secondary)
-                    .background(Circle().fill(Color.white.opacity(hover ? 0.14 : 0.06)))
+            if replying {
+                HStack(alignment: .bottom, spacing: 6) {
+                    TextField(String(localized: "Your answer…"), text: $reply, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5))
+                        .lineLimit(1...6)
+                        .focused($focused)
+                        .onSubmit(send)
+                        .padding(.horizontal, 8).padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(Color.black.opacity(0.25)))
+                    Button(action: send) {
+                        Image(systemName: "arrow.up").font(.system(size: 11, weight: .bold))
+                            .frame(width: 24, height: 24).foregroundStyle(.white)
+                            .background(Circle().fill(reply.isEmpty ? Color.white.opacity(0.1) : Color.accentColor))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || sending)
+                }
+                .padding(.leading, 22)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .buttonStyle(.plain)
-            .help(String(localized: "Done – remove from the inbox"))
         }
         .padding(10)
         .background(
@@ -166,6 +214,47 @@ private struct InboxCard: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .stroke(item.isUrgent ? Color.orange.opacity(0.35) : Color.white.opacity(0.06))
         )
+        .onHover { hover = $0 }
+    }
+
+    /// Sends the answer to the conductor with the original item quoted, then marks the item done.
+    private func send() {
+        let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !sending else { return }
+        sending = true
+        let message = "Antwort von Tobi auf deine Meldung „\(item.text ?? "")“:\n\(text)\n\n"
+            + "Bitte an die betroffene Session weitergeben und Bescheid geben, wenn erledigt."
+        Task {
+            let ok = await store.send(message, to: conductor)
+            sending = false
+            if ok {
+                reply = ""
+                replying = false
+                store.ack(item, conductor: conductor)
+            } else {
+                store.lastError = String(localized: "Could not send the message")
+            }
+        }
+    }
+}
+
+private struct CardAction: View {
+    let symbol: String
+    let title: String
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold))
+                Text(verbatim: title)
+            }
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .foregroundStyle(hover ? Color.white : Color.secondary)
+            .background(Capsule().fill(Color.white.opacity(hover ? 0.14 : 0.07)))
+        }
+        .buttonStyle(.plain)
         .onHover { hover = $0 }
     }
 }

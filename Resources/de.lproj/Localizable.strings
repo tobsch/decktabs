@@ -128,3 +128,10 @@
 "Show workers" = "Worker einblenden";
 "Hide workers" = "Worker ausblenden";
 "Could not change the conductor of “%@”" = "Conductor von „%@“ konnte nicht geändert werden";
+
+/* Inbox replies */
+"Reply" = "Antworten";
+"Open the session" = "Session öffnen";
+"Answer via the conductor – it passes your answer on" = "Über den Conductor antworten – er gibt deine Antwort weiter";
+"Mark as read – nothing gets passed on" = "Als gelesen markieren – es wird nichts weitergegeben";
+"Your answer…" = "Deine Antwort …";
