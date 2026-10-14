@@ -44,6 +44,8 @@ is kept alive, so switching is instant and scrollback survives.
 - In “Areas”, drag local sessions into another group (`agent-deck group move`); empty groups stay visible as targets
 - Each row shows the harness (Claude, Codex, Gemini, …) with its own glyph; the header adds the git branch
 - Header: title, area, tool, branch, path, status pill, reveal folder, copy attach command, reconnect
+- Drop files or images onto the terminal: their paths are pasted like in Terminal.app, so Claude Code and
+  Codex attach images natively. For remote sessions the files are uploaded to `/tmp/decktabs/` over SSH first
 - Terminal with a muted palette and padding; if the connection drops you get a “No Connection” state
   instead of a reconnect loop
 - Keys: ⌘K jump to (floating search, also matches folders), ⌘J next new session, ⌘1–⌘9 direct

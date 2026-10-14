@@ -18,6 +18,8 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
     var remote: String? = nil
     /// Session ID on the remote (`id` is made unique by prefixing the remote name).
     var remoteID: String? = nil
+    /// SSH target of the remote (e.g. "user@host"), used to upload dropped files.
+    var remoteHost: String? = nil
 
     var isRemote: Bool { remote != nil }
     /// Sidebar area: the agent-deck group for local sessions, the machine for remote ones.
@@ -263,17 +265,19 @@ final class SessionStore: ObservableObject {
     /// Sessions on agent-deck remotes (over SSH, so polled less often).
     func refreshRemotes() {
         Task.detached {
-            struct Remote: Decodable { let name: String }
-            let names = (Tools.run(Tools.agentDeck, ["remote", "list", "--json"])
-                .flatMap { try? JSONDecoder().decode([Remote].self, from: $0) } ?? []).map(\.name)
+            struct Remote: Decodable { let name: String; let host: String? }
+            let remotes = Tools.run(Tools.agentDeck, ["remote", "list", "--json"])
+                .flatMap { try? JSONDecoder().decode([Remote].self, from: $0) } ?? []
             var all: [DeckSession] = []
-            for name in names {
+            for remote in remotes {
+                let name = remote.name
                 guard let data = Tools.run(Tools.agentDeck, ["remote", "sessions", name, "--json"]),
                       let list = try? JSONDecoder().decode([DeckSession].self, from: data) else { continue }
                 all += list.map { s in
                     var r = s
                     r.remoteID = s.id
                     r.remote = name
+                    r.remoteHost = remote.host
                     r.id = "\(name)/\(s.id)"
                     return r
                 }

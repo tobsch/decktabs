@@ -6,16 +6,17 @@ import SwiftUI
 @MainActor
 final class TerminalPool: NSObject, ObservableObject, LocalProcessTerminalViewDelegate {
     static let shared = TerminalPool()
-    private var views: [String: LocalProcessTerminalView] = [:]
+    private var views: [String: DropTerminalView] = [:]
     private var started: [String: Date] = [:]
     /// Sessions whose client exited right after starting (session missing etc.).
     @Published private(set) var failed: Set<String> = []
     @Published private(set) var revision = 0
 
-    func view(for session: DeckSession) -> LocalProcessTerminalView? {
-        if let v = views[session.id], v.process.running { return v }
+    func view(for session: DeckSession) -> DropTerminalView? {
+        if let v = views[session.id], v.process.running { v.session = session; return v }
         if failed.contains(session.id) { return nil }
-        let v = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        let v = DropTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        v.session = session
         v.processDelegate = self
         v.font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
         v.installColors(Theme.ansi)
