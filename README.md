@@ -13,6 +13,8 @@ always at hand, sorted by last activity, with a clear signal for “something ne
 |---|---|
 | ![Areas](docs/screenshot-areas.png) | ![Jump to](docs/screenshot-jump.png) |
 
+![Conductor with inbox and workers](docs/screenshot-conductor.png)
+
 ## Requirements
 
 - macOS 15 or later, Xcode command line tools (Swift 6)
@@ -44,6 +46,10 @@ is kept alive, so switching is instant and scrollback survives.
 - In “Areas”, drag local sessions into another group (`agent-deck group move`); empty groups stay visible as targets
 - Each row shows the harness (Claude, Codex, Gemini, …) with its own glyph; the header adds the git branch
 - Header: title, area, tool, branch, path, status pill, reveal folder, copy attach command, reconnect
+- Conductors: pinned on top with their workers nested underneath; a side panel shows the conductor's inbox
+  (`conductor notify` / `outbox`, tick to ack), its workers and a field to message it (`session send`).
+  Urgent items raise a macOS notification. Create, configure (description, heartbeat, POLICY.md, CLAUDE.md,
+  heartbeat rules, learnings), restart or remove conductors right from the sidebar
 - Drop files or images onto the terminal: their paths are pasted like in Terminal.app, so Claude Code and
   Codex attach images natively. For remote sessions the files are uploaded to `/tmp/decktabs/` over SSH first
 - Terminal with a muted palette and padding; if the connection drops you get a “No Connection” state
