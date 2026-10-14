@@ -81,7 +81,6 @@ transcript – handy for screenshots without leaking real session content.
 - tmux uses `window-size latest`: using the same session in a terminal and in the app at the same time makes
   the window size jump to the most recent client.
 - agent-deck's status line and Ctrl+Q binding are tmux-global and also show up here.
-- Conductors are detected by group/title prefix `conductor` (`list --json` has no `is_conductor`).
 - agent-deck's author is building an official Mac app (chat view rendered from transcripts, browser panel,
   remotes) on top of the interface in agent-deck's `docs/macapp-core.md`. DeckTabs is a different take –
   the raw terminal in tabs – and would happily switch to those events/APIs.

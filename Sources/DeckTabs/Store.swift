@@ -14,6 +14,8 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
     let last_activity_at: String?
     let archived: Bool?
     let parent_session_id: String?
+    /// Set by agent-deck for conductor sessions (only present when true).
+    let is_conductor: Bool?
     /// Name of the agent-deck remote (e.g. "build-server"), nil = local.
     var remote: String? = nil
     /// Session ID on the remote (`id` is made unique by prefixing the remote name).
@@ -41,7 +43,7 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
 
     /// agent-deck conductors live in a "conductor" group or are titled "conductor-…".
     var isConductor: Bool {
-        group.lowercased().hasPrefix("conductor") || title.lowercased().hasPrefix("conductor")
+        is_conductor == true || group.lowercased().hasPrefix("conductor") || title.lowercased().hasPrefix("conductor-")
     }
 
     var isRunning: Bool { status == "running" || status == "starting" }
