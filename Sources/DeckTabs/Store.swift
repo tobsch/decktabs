@@ -161,6 +161,11 @@ final class SessionStore: ObservableObject {
     var notifiedOutbox: Set<String> = []
     var outboxPrimed = false
     weak static var current: SessionStore?
+    /// Conductors whose workers are folded away in the sidebar.
+    @Published var collapsedConductors: Set<String> =
+        Set(UserDefaults.standard.stringArray(forKey: "collapsedConductors") ?? []) {
+        didSet { UserDefaults.standard.set(Array(collapsedConductors), forKey: "collapsedConductors") }
+    }
 
     /// Current git branch per local session (refreshed every 10 s).
     @Published private(set) var branches: [String: String] = [:]
@@ -223,7 +228,7 @@ final class SessionStore: ObservableObject {
 
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
-        let top = conductors.flatMap { [$0] + children(of: $0) }
+        let top = conductors.flatMap { [$0] + (collapsedConductors.contains($0.id) ? [] : children(of: $0)) }
         return mode == .activity ? top + others : conductors + groups.flatMap(\.sessions)
     }
 

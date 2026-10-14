@@ -121,3 +121,10 @@
 "Edit its policy afterwards via Configure…" = "Policy danach über „Konfigurieren …“ anpassen";
 "Create" = "Anlegen";
 "agent-deck could not create the conductor." = "agent-deck konnte den Conductor nicht anlegen.";
+
+/* Conductor assignment */
+"Conductor" = "Conductor";
+"None" = "Keiner";
+"Show workers" = "Worker einblenden";
+"Hide workers" = "Worker ausblenden";
+"Could not change the conductor of “%@”" = "Conductor von „%@“ konnte nicht geändert werden";

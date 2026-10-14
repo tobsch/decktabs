@@ -121,6 +121,27 @@ extension SessionStore {
 
     // MARK: Actions
 
+    func toggleCollapsed(_ c: DeckSession) {
+        withAnimation(.snappy(duration: 0.25)) {
+            if collapsedConductors.contains(c.id) { collapsedConductors.remove(c.id) }
+            else { collapsedConductors.insert(c.id) }
+        }
+    }
+
+    /// Hands a session to a conductor (`session set-parent`) or detaches it (`unset-parent`).
+    func assign(_ s: DeckSession, to conductor: DeckSession?) {
+        guard !s.isRemote else { return }
+        if Demo.enabled { return }
+        let args = conductor.map { ["session", "set-parent", s.id, $0.id] } ?? ["session", "unset-parent", s.id]
+        Task.detached {
+            let ok = Tools.run(Tools.agentDeck, args) != nil
+            await MainActor.run {
+                if !ok { self.lastError = String(localized: "Could not change the conductor of “\(s.title)”") }
+                self.refresh()
+            }
+        }
+    }
+
     func ack(_ item: OutboxItem, conductor s: DeckSession) {
         guard let name = conductorName(s) else { return }
         withAnimation(.snappy(duration: 0.25)) {

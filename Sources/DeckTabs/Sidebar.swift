@@ -41,9 +41,8 @@ struct Sidebar: View {
                 List(selection: $store.selectedID) {
                     Section {
                             ForEach(store.conductors) { c in
-                                rows([c], now: ctx.date, showGroup: true)
-                                    .contextMenu { conductorMenu(c) }
-                                if store.mode == .activity {
+                                rows([c], now: ctx.date, showGroup: true, conductorFold: store.collapsedConductors.contains(c.id))
+                                if store.mode == .activity && !store.collapsedConductors.contains(c.id) {
                                     rows(store.children(of: c), now: ctx.date, showGroup: true, nested: true)
                                 }
                             }
@@ -108,6 +107,22 @@ struct Sidebar: View {
     }
 
     @ViewBuilder
+    private func sessionMenu(_ s: DeckSession) -> some View {
+        if !s.isRemote && !store.conductors.isEmpty {
+            let current = store.conductorAncestor(of: s)
+            Menu("Conductor") {
+                ForEach(store.conductors.filter { !$0.isRemote }) { c in
+                    Toggle(store.conductorName(c) ?? c.title, isOn: Binding(
+                        get: { current?.id == c.id },
+                        set: { on in if on { store.assign(s, to: c) } }))
+                }
+                Divider()
+                Button("None") { store.assign(s, to: nil) }.disabled(current == nil)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func conductorMenu(_ c: DeckSession) -> some View {
         Button("Configure…") { configuring = c }
             .disabled(c.isRemote)
@@ -119,7 +134,7 @@ struct Sidebar: View {
 
     @ViewBuilder
     private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil,
-                      nested: Bool = false) -> some View {
+                      nested: Bool = false, conductorFold: Bool? = nil) -> some View {
         ForEach(list) { s in
             let inbox = store.pendingOutbox(s)
             SessionRow(
@@ -130,8 +145,12 @@ struct Sidebar: View {
                 now: now,
                 inboxCount: inbox.count,
                 inboxUrgent: inbox.contains(where: \.isUrgent),
-                nested: nested
+                nested: nested,
+                fold: conductorFold.map { collapsed in
+                    FoldState(collapsed: collapsed, count: store.children(of: s).count) { store.toggleCollapsed(s) }
+                }
             )
+            .contextMenu { if store.isConductor(s) { conductorMenu(s) } else { sessionMenu(s) } }
             .tag(s.id)
             .draggableSession(s, enabled: store.mode == .groups)
             .dropTarget(dropGroup, store: store)
@@ -204,6 +223,8 @@ struct SessionRow: View {
     var inboxUrgent = false
     /// Worker of a conductor: indented under it with a tree line.
     var nested = false
+    /// Conductor row: disclosure chevron to fold its workers.
+    var fold: FoldState? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -233,6 +254,23 @@ struct SessionRow: View {
                 .lineLimit(1)
             }
             Spacer(minLength: 4)
+            if let fold, fold.count > 0 {
+                Button(action: fold.toggle) {
+                    HStack(spacing: 3) {
+                        if fold.collapsed {
+                            Text(verbatim: "\(fold.count)").font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .rotationEffect(.degrees(fold.collapsed ? 0 : 90))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(fold.collapsed ? String(localized: "Show workers") : String(localized: "Hide workers"))
+            }
             if inboxCount > 0 {
                 Text(verbatim: "\(inboxCount)")
                     .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
@@ -258,6 +296,12 @@ struct SessionRow: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
     }
+}
+
+struct FoldState {
+    let collapsed: Bool
+    let count: Int
+    let toggle: () -> Void
 }
 
 struct SearchButton: View {
