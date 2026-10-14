@@ -158,13 +158,13 @@ private struct InboxCard: View {
                         Text(Theme.ago(item.date)).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                         if let subject {
-                            CardAction(symbol: "arrow.up.forward.square", title: subject.title) {
+                            CardAction(symbol: "arrow.up.forward.square") {
                                 store.selectedID = subject.id
                             }
-                            .help(String(localized: "Open the session"))
+                            .help(String(localized: "Open “\(subject.title)”"))
                         }
                         if !conductor.isRemote {
-                            CardAction(symbol: "arrowshape.turn.up.left", title: String(localized: "Reply")) {
+                            CardAction(symbol: "arrowshape.turn.up.left", active: replying) {
                                 withAnimation(.snappy(duration: 0.2)) { replying.toggle() }
                                 focused = replying
                             }
@@ -240,19 +240,18 @@ private struct InboxCard: View {
 
 private struct CardAction: View {
     let symbol: String
-    let title: String
+    var active = false
     let action: () -> Void
     @State private var hover = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 3) {
-                Image(systemName: symbol).font(.system(size: 9.5, weight: .semibold))
-                Text(verbatim: title)
-            }
-            .padding(.horizontal, 6).padding(.vertical, 2)
-            .foregroundStyle(hover ? Color.white : Color.secondary)
-            .background(Capsule().fill(Color.white.opacity(hover ? 0.14 : 0.07)))
+            Image(systemName: symbol)
+                .font(.system(size: 10.5, weight: .semibold))
+                .frame(width: 22, height: 20)
+                .foregroundStyle(active ? Color.accentColor : hover ? Color.white : Color.secondary)
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(hover || active ? 0.12 : 0)))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
