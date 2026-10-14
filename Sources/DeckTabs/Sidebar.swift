@@ -24,6 +24,8 @@ struct Sidebar: View {
     @ObservedObject var keys = KeyState.shared
     @Binding var showSwitcher: Bool
     var toggleSidebar: () -> Void = {}
+    @State private var configuring: DeckSession?
+    @State private var creatingConductor = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,17 +39,26 @@ struct Sidebar: View {
 
             TimelineView(.periodic(from: .now, by: 30)) { ctx in
                 List(selection: $store.selectedID) {
-                    if !store.conductors.isEmpty {
-                        Section {
+                    Section {
                             ForEach(store.conductors) { c in
                                 rows([c], now: ctx.date, showGroup: true)
+                                    .contextMenu { conductorMenu(c) }
                                 if store.mode == .activity {
                                     rows(store.children(of: c), now: ctx.date, showGroup: true, nested: true)
                                 }
                             }
-                        } header: {
-                            SectionTitle("Conductors", symbol: "point.3.connected.trianglepath.dotted")
-                        }
+                    } header: {
+                            HStack {
+                                SectionTitle("Conductors", symbol: "point.3.connected.trianglepath.dotted")
+                                Spacer()
+                                Button { creatingConductor = true } label: {
+                                    Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(.secondary)
+                                .help(String(localized: "New conductor…"))
+                                .padding(.top, 4)
+                            }
                     }
                     switch store.mode {
                     case .activity:
@@ -83,6 +94,27 @@ struct Sidebar: View {
             footer
         }
         .navigationSplitViewColumnWidth(min: 230, ideal: 270, max: 380)
+        .sheet(item: $configuring) { c in ConductorSettingsSheet(conductor: c).environmentObject(store) }
+        .sheet(isPresented: $creatingConductor) { NewConductorSheet().environmentObject(store) }
+        .onAppear {
+            // Screenshots: `--demo-configure` opens the settings of the first conductor.
+            if Demo.enabled && CommandLine.arguments.contains("--demo-configure") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { configuring = store.conductors.first }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .configureConductor)) { n in
+            configuring = store.sessions.first { $0.id == n.object as? String }
+        }
+    }
+
+    @ViewBuilder
+    private func conductorMenu(_ c: DeckSession) -> some View {
+        Button("Configure…") { configuring = c }
+            .disabled(c.isRemote)
+        Button("Restart") { store.restartConductor(c) }
+            .disabled(c.isRemote)
+        Divider()
+        Button("New Conductor…") { creatingConductor = true }
     }
 
     @ViewBuilder

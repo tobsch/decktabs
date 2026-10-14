@@ -72,6 +72,29 @@ enum Demo {
         ]]
     }
 
+    static func conductorFile(_ f: ConductorFile) -> String {
+        switch f {
+        case .policy: """
+            # Conductor Policy
+
+            ## Scope
+            Only the backend and frontend sessions. Ignore everything else.
+
+            ## Safe to auto-respond
+            - "Should I continue?" for local, reversible work -> yes
+            - Questions answered by the repo's conventions
+
+            ## Always escalate
+            - Deploys, force-pushes, deleting data
+            - Anything with credentials
+            - Design decisions with several valid options
+            """
+        case .instructions: "# Conductor: ops (default profile)\n\nYou are **ops**, a conductor running on **Claude Code**.\n"
+        case .heartbeat: "# Heartbeat Rules\n\n- Check waiting sessions first\n- Report errors once, not on every beat\n"
+        case .learnings: "# Conductor Learnings\n\n- billing-service: always ask before schema migrations.\n"
+        }
+    }
+
     static func seen(_ s: DeckSession) -> Date {
         let unread = specs.first { $0.title == s.title }?.unread ?? false
         return unread ? s.lastActivity.addingTimeInterval(-600) : Date()

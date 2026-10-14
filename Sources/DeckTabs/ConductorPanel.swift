@@ -1,5 +1,10 @@
 import SwiftUI
 
+extension Notification.Name {
+    /// Opens the settings sheet of the conductor whose session id is the object.
+    static let configureConductor = Notification.Name("configureConductor")
+}
+
 /// Right-hand panel next to a conductor's terminal: what it wants from you, its workers,
 /// and a field to message it.
 struct ConductorPanel: View {
@@ -13,6 +18,18 @@ struct ConductorPanel: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     ConductorSummary(conductor: conductor, status: store.status(of: conductor))
+                        .overlay(alignment: .topTrailing) {
+                            if !conductor.isRemote {
+                                Button {
+                                    NotificationCenter.default.post(name: .configureConductor, object: conductor.id)
+                                } label: {
+                                    Image(systemName: "gearshape").font(.system(size: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
+                                .help(String(localized: "Configure…"))
+                            }
+                        }
 
                     PanelSection(title: String(localized: "Inbox"), count: inbox.count) {
                         if inbox.isEmpty {
