@@ -16,6 +16,8 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
     let parent_session_id: String?
     /// Set by agent-deck for conductor sessions (only present when true).
     let is_conductor: Bool?
+    /// Claude's transcript of the current conversation (token counting).
+    let transcript_path: String?
     /// Name of the agent-deck remote (e.g. "build-server"), nil = local.
     var remote: String? = nil
     /// Session ID on the remote (`id` is made unique by prefixing the remote name).
@@ -277,13 +279,10 @@ final class SessionStore: ObservableObject {
         refreshGroups()
         refreshConductors()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refreshBranches() }
-        refreshUsage(sync: true)
-        // Reading the numbers is cheap; importing transcripts costs a few seconds of CPU, so every 5 minutes.
-        var ticks = 0
-        usageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            ticks += 1
-            let sync = ticks % 5 == 0
-            Task { @MainActor in self?.refreshUsage(sync: sync) }
+        refreshUsage()
+        // Transcripts are read incrementally, so this stays cheap after the first pass.
+        usageTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshUsage() }
         }
         remoteTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in

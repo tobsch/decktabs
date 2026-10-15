@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Token use of one session (`agent-deck costs sessions --json`), read from the agents' transcripts.
-struct TokenUsage: Decodable, Equatable {
+/// Token use of one session's current conversation, read from its Claude transcript.
+struct TokenUsage: Codable, Equatable {
     var input_tokens: Int = 0
     var output_tokens: Int = 0
     var cache_read: Int = 0
@@ -10,10 +10,15 @@ struct TokenUsage: Decodable, Equatable {
 
     var total: Int { input_tokens + output_tokens + cache_read + cache_write }
 
+    static func - (a: TokenUsage, b: TokenUsage) -> TokenUsage {
+        TokenUsage(input_tokens: a.input_tokens - b.input_tokens, output_tokens: a.output_tokens - b.output_tokens,
+                   cache_read: a.cache_read - b.cache_read, cache_write: a.cache_write - b.cache_write, model: a.model)
+    }
+
     static func + (a: TokenUsage, b: TokenUsage) -> TokenUsage {
         TokenUsage(input_tokens: a.input_tokens + b.input_tokens, output_tokens: a.output_tokens + b.output_tokens,
                    cache_read: a.cache_read + b.cache_read, cache_write: a.cache_write + b.cache_write,
-                   model: a.model == b.model ? a.model : nil)
+                   model: a.model == b.model || b.total == 0 ? a.model : a.total == 0 ? b.model : nil)
     }
 
     /// Tooltip: where the tokens went. Cache reads dominate long sessions and are cheap.
@@ -64,21 +69,93 @@ extension SessionStore {
         return groups.map { ($0.key, $0.value.0, $0.value.1) }.sorted { $0.usage.total > $1.usage.total }
     }
 
-    /// Imports new transcript lines (`costs sync`, a few seconds of CPU) and reloads the per-session numbers.
-    func refreshUsage(sync: Bool) {
+    /// Counts tokens straight from the Claude transcripts. Each API response is counted once:
+    /// Claude Code writes one line per content block, all carrying the same usage (summing lines
+    /// over-counts about 2x, which is what `agent-deck costs` does).
+    func refreshUsage() {
         if Demo.enabled { return }
+        let files = sessions.filter { !$0.isRemote }.compactMap { s in s.transcript_path.map { (s.id, $0) } }
         Task.detached(priority: .utility) {
-            if sync { _ = Tools.run(Tools.agentDeck, ["costs", "sync"]) }
-            struct Row: Decodable { let session_id: String; let input_tokens: Int; let output_tokens: Int
-                                    let cache_read: Int; let cache_write: Int; let model: String? }
-            let rows = Tools.run(Tools.agentDeck, ["costs", "sessions", "--json", "--limit", "500"])
-                .flatMap { try? JSONDecoder().decode([Row].self, from: $0) } ?? []
-            let map = Dictionary(rows.map { ($0.session_id, TokenUsage(input_tokens: $0.input_tokens, output_tokens: $0.output_tokens,
-                                                                      cache_read: $0.cache_read, cache_write: $0.cache_write,
-                                                                      model: $0.model)) },
-                                 uniquingKeysWith: { a, _ in a })
+            let map = await TranscriptScanner.shared.usage(for: files)
             await MainActor.run { if map != self.usage { self.usage = map } }
         }
+    }
+}
+
+/// Reads Claude transcripts incrementally. Claude Code writes the lines of one response back to back,
+/// so remembering the last message id is enough to count each response once. The read position per
+/// file is kept in Caches, so a restart of the app does not reread a gigabyte of transcripts.
+actor TranscriptScanner {
+    static let shared = TranscriptScanner()
+
+    private struct FileState: Codable {
+        var offset: UInt64 = 0
+        var total = TokenUsage()
+        var lastKey: String?
+        var lastUsage = TokenUsage()
+    }
+    private var files: [String: FileState]
+    private var dirty = false
+    private let cacheURL: URL = {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("DeckTabs")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("transcript-usage.json")
+    }()
+
+    init() {
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("DeckTabs/transcript-usage.json")
+        files = (try? JSONDecoder().decode([String: FileState].self, from: Data(contentsOf: url))) ?? [:]
+    }
+
+    func usage(for sessions: [(id: String, path: String)]) -> [String: TokenUsage] {
+        var out: [String: TokenUsage] = [:]
+        for (id, path) in sessions where path.hasSuffix(".jsonl") {
+            // Subagents (Task tool) write their own transcripts next to the main one.
+            let sub = (path as NSString).deletingPathExtension + "/subagents"
+            let extra = ((try? FileManager.default.contentsOfDirectory(atPath: sub)) ?? [])
+                .filter { $0.hasSuffix(".jsonl") }.map { sub + "/" + $0 }
+            let u = ([path] + extra).map(scan).reduce(TokenUsage(), +)
+            if u.total > 0 { out[id] = u }
+        }
+        if dirty, let data = try? JSONEncoder().encode(files) {
+            try? data.write(to: cacheURL, options: .atomic)
+            dirty = false
+        }
+        return out
+    }
+
+    private func scan(_ path: String) -> TokenUsage {
+        var st = files[path] ?? FileState()
+        guard let h = FileHandle(forReadingAtPath: path) else { return st.total }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        if size < st.offset { st = FileState() }   // rewritten: start over
+        guard size > st.offset else { return st.total }
+        try? h.seek(toOffset: st.offset)
+        guard let data = try? h.readToEnd(), let end = data.lastIndex(of: UInt8(ascii: "\n")) else { return st.total }
+        let needle = Data("\"usage\"".utf8)
+        for line in data[data.startIndex...end].split(separator: UInt8(ascii: "\n")) where line.range(of: needle) != nil {
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                  obj["type"] as? String == "assistant",
+                  let msg = obj["message"] as? [String: Any], let u = msg["usage"] as? [String: Any] else { continue }
+            let key = msg["id"] as? String ?? obj["requestId"] as? String
+            let new = TokenUsage(input_tokens: u["input_tokens"] as? Int ?? 0, output_tokens: u["output_tokens"] as? Int ?? 0,
+                                 cache_read: u["cache_read_input_tokens"] as? Int ?? 0,
+                                 cache_write: u["cache_creation_input_tokens"] as? Int ?? 0,
+                                 model: msg["model"] as? String)
+            // Another line of the same response: replace its usage instead of adding it again.
+            if key != nil, key == st.lastKey { st.total = st.total - st.lastUsage }
+            st.lastKey = key
+            st.lastUsage = new
+            let model = new.model ?? st.total.model
+            st.total = st.total + new
+            st.total.model = model
+        }
+        st.offset += UInt64(end - data.startIndex + 1)
+        files[path] = st
+        dirty = true
+        return st.total
     }
 }
 
