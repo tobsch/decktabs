@@ -175,6 +175,8 @@ final class SessionStore: ObservableObject {
     var notifiedOutbox: Set<String> = []
     var outboxPrimed = false
     weak static var current: SessionStore?
+    /// Conductors whose finished tasks are unfolded in the sidebar.
+    @Published var showDone: Set<String> = []
     /// Conductors whose workers are folded away in the sidebar.
     @Published var collapsedConductors: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: "collapsedConductors") ?? []) {
@@ -242,7 +244,7 @@ final class SessionStore: ObservableObject {
 
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
-        let top = conductors.flatMap { [$0] + (collapsedConductors.contains($0.id) ? [] : children(of: $0)) }
+        let top = conductors.flatMap { [$0] + (collapsedConductors.contains($0.id) ? [] : visibleWorkers(of: $0)) }
         return top + (mode == .activity ? others : groups.flatMap(\.sessions))
     }
 

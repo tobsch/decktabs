@@ -1,2 +1,5 @@
 /* English is the development language; keys are the English strings. */
 "Done" = "Done";
+"In progress" = "In progress";
+"Other" = "Other";
+"Task" = "Task";

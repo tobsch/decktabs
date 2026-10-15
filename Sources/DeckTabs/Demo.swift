@@ -22,9 +22,16 @@ enum Demo {
 
     private static let specs: [Spec] = [
         Spec(title: "conductor-ops", group: "conductor", tool: "claude", status: "waiting", minutesAgo: 3),
-        Spec(title: "api-gateway", group: "backend", tool: "claude", status: "running", minutesAgo: 0, parent: 0),
-        Spec(title: "billing-service", group: "backend", tool: "codex", status: "waiting", minutesAgo: 6, unread: true, parent: 0),
-        Spec(title: "web-dashboard", group: "frontend", tool: "claude", status: "running", minutesAgo: 1, parent: 0),
+        Spec(title: "builder-billing-export", group: "agents", tool: "claude", status: "waiting", minutesAgo: 9, parent: 0),
+        Spec(title: "reviewer-billing-export", group: "agents", tool: "claude", status: "running", minutesAgo: 0, parent: 0),
+        Spec(title: "security-billing-export", group: "agents", tool: "claude", status: "stopped", minutesAgo: 2, parent: 0),
+        Spec(title: "ux-billing-export", group: "agents", tool: "claude", status: "waiting", minutesAgo: 1, parent: 0),
+        Spec(title: "qa-billing-export", group: "agents", tool: "claude", status: "running", minutesAgo: 0, parent: 0),
+        Spec(title: "builder-dark-mode", group: "agents", tool: "claude", status: "running", minutesAgo: 0, parent: 0),
+        Spec(title: "api-gateway", group: "backend", tool: "claude", status: "waiting", minutesAgo: 6, unread: true, parent: 0),
+        Spec(title: "builder-sso-login", group: "agents", tool: "claude", status: "stopped", minutesAgo: 90, parent: 0),
+        Spec(title: "qa-sso-login", group: "agents", tool: "claude", status: "stopped", minutesAgo: 80, parent: 0),
+        Spec(title: "web-dashboard", group: "frontend", tool: "claude", status: "running", minutesAgo: 1),
         Spec(title: "design-system", group: "frontend", tool: "claude", status: "waiting", minutesAgo: 24, unread: true),
         Spec(title: "gpu-benchmarks", group: "lab", tool: "claude", status: "waiting", minutesAgo: 52,
              remote: "build-server"),
@@ -41,6 +48,8 @@ enum Demo {
             "path": (s.remote != nil ? "/home/dev/" : NSHomeDirectory() + "/code/") + s.title,
             "tmux_session": "agentdeck_\(s.title)",
             "last_activity_at": ISO8601DateFormatter().string(from: date),
+            // Listed order is start order, so a task's stages appear as builder, then the checks.
+            "created_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(-Double(200 - i) * 600)),
         ]
         if let p = s.parent { json["parent_session_id"] = "demo-\(p)" }
         var session = try! JSONDecoder().decode(DeckSession.self,

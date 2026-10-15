@@ -49,6 +49,16 @@ extension SessionStore {
         workUnits(of: conductor).flatMap(\.sessions)
     }
 
+    /// What the sidebar shows for a conductor: one entry per task (its current session), then sessions
+    /// without a task, finished tasks only when unfolded. Drives ⌘1–9.
+    func visibleWorkers(of conductor: DeckSession) -> [DeckSession] {
+        let units = workUnits(of: conductor)
+        let tasks = units.filter { $0.task != nil && $0.isActive }.map(\.current)
+        let loose = units.filter { $0.task == nil }.flatMap(\.sessions)
+        let done = showDone.contains(conductor.id) ? units.filter { $0.task != nil && !$0.isActive }.map(\.current) : []
+        return tasks + loose + done
+    }
+
     /// A conductor's workers ordered by flow instead of last activity: sessions of one task
     /// ("builder-x", "qa-x" → "x") stay together in the order they were started, units with a
     /// live session come first, newest unit first within each half.
@@ -61,7 +71,7 @@ extension SessionStore {
             return WorkUnit(id: key, task: key.hasPrefix("task:") ? String(key.dropFirst(5)) : nil, sessions: ordered)
         }
         .sorted { a, b in
-            a.isActive != b.isActive ? a.isActive : a.started > b.started
+            a.isActive != b.isActive ? a.isActive : a.lastActivity > b.lastActivity
         }
     }
 
@@ -217,4 +227,18 @@ struct WorkUnit: Identifiable {
     let sessions: [DeckSession]
     var isActive: Bool { sessions.contains { !$0.isStopped } }
     var started: Date { sessions.map(\.created).min() ?? .distantPast }
+    var lastActivity: Date { sessions.map(\.lastActivity).max() ?? .distantPast }
+    /// The session to open for the whole task: the one working now, else the newest that waits.
+    var current: DeckSession {
+        sessions.last(where: \.isRunning) ?? sessions.last(where: { !$0.isStopped }) ?? sessions.last!
+    }
+    /// "keep-role-sessions" → "Keep role sessions"; board ids are shortened.
+    var displayName: String {
+        guard let task else { return sessions[0].title }
+        if task.count == 26, task.allSatisfy({ $0.isNumber || $0.isUppercase }) {
+            return String(localized: "Task") + " …" + task.suffix(6)
+        }
+        let words = task.replacingOccurrences(of: "-", with: " ").replacingOccurrences(of: "_", with: " ")
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
 }
