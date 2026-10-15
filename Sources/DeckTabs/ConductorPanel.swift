@@ -45,6 +45,8 @@ struct ConductorPanel: View {
                         }
                     }
 
+                    TokenSummary(conductor: conductor)
+
                     PanelSection(title: String(localized: "Workers"), count: workers.count) {
                         if workers.isEmpty {
                             Text("Sessions this conductor starts show up here.")
@@ -300,8 +302,14 @@ private struct WorkerRow: View {
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
-                Text(Theme.ago(session.lastActivity))
-                    .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(Theme.ago(session.lastActivity))
+                        .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                    if let u = store.usage(of: session) {
+                        TokenLabel(usage: u, suffix: false)
+                            .font(.system(size: 10.5)).foregroundStyle(.tertiary)
+                    }
+                }
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(hover ? 0.07 : 0)))
@@ -360,6 +368,54 @@ private struct Composer: View {
                 withAnimation { sent = false }
             } else {
                 store.lastError = String(localized: "Could not send the message")
+            }
+        }
+    }
+}
+
+/// Tokens of the conductor and its workers, and per task when workers follow the "<role>-<task>" naming.
+private struct TokenSummary: View {
+    @EnvironmentObject var store: SessionStore
+    let conductor: DeckSession
+
+    var body: some View {
+        let (own, workers) = store.conductorUsage(conductor)
+        let tasks = store.taskUsage(conductor).filter { $0.roles > 1 }
+        if (own + workers).total > 0 {
+            PanelSection(title: String(localized: "Tokens"), count: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(verbatim: TokenUsage.format((own + workers).total))
+                            .font(.system(size: 20, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .help((own + workers).breakdown)
+                        Text("in total").font(.system(size: 11.5)).foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 12) {
+                        Label { Text(verbatim: TokenUsage.format(own.total)) } icon: { Image(systemName: "point.3.connected.trianglepath.dotted") }
+                            .help(String(localized: "Conductor") + "\n" + own.breakdown)
+                        Label { Text(verbatim: TokenUsage.format(workers.total)) } icon: { Image(systemName: "person.2") }
+                            .help(String(localized: "Workers") + "\n" + workers.breakdown)
+                    }
+                    .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                    if !tasks.isEmpty {
+                        VStack(spacing: 3) {
+                            ForEach(tasks, id: \.task) { t in
+                                HStack {
+                                    Text(verbatim: t.task).lineLimit(1).truncationMode(.middle)
+                                        .foregroundStyle(.white.opacity(0.85))
+                                    Text("\(t.roles) roles").foregroundStyle(.tertiary)
+                                    Spacer(minLength: 6)
+                                    Text(verbatim: TokenUsage.format(t.usage.total)).monospacedDigit()
+                                        .foregroundStyle(.secondary)
+                                }
+                                .font(.system(size: 11.5))
+                                .help(t.usage.breakdown)
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
+                }
             }
         }
     }

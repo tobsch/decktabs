@@ -131,6 +131,9 @@ final class SessionStore: ObservableObject {
         didSet { if let selectedID { markSeen(selectedID) } }
     }
     @Published var lastError: String?
+    /// Tokens per session id (from `agent-deck costs`).
+    @Published var usage: [String: TokenUsage] = [:]
+    private var usageTimer: Timer?
     /// Sessions with a start or restart in flight.
     @Published var starting: Set<String> = []
     @Published var loaded = false
@@ -274,6 +277,14 @@ final class SessionStore: ObservableObject {
         refreshGroups()
         refreshConductors()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refreshBranches() }
+        refreshUsage(sync: true)
+        // Reading the numbers is cheap; importing transcripts costs a few seconds of CPU, so every 5 minutes.
+        var ticks = 0
+        usageTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            ticks += 1
+            let sync = ticks % 5 == 0
+            Task { @MainActor in self?.refreshUsage(sync: sync) }
+        }
         remoteTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshRemotes()

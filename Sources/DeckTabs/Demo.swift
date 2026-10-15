@@ -55,6 +55,10 @@ enum Demo {
     /// The "ops" conductor with a few items in its inbox.
     @MainActor
     static func applyConductors(to store: SessionStore) {
+        let fake = { (o: Int, r: Int) in TokenUsage(input_tokens: o / 50, output_tokens: o, cache_read: r, cache_write: r / 30, model: "claude-opus-5-5") }
+        let sizes: [String: (Int, Int)] = ["conductor-ops": (31_000, 8_400_000), "api-gateway": (185_000, 42_000_000),
+                                            "billing-service": (27_000, 6_100_000), "web-dashboard": (29_000, 5_000_000)]
+        for s in store.sessions { if let v = sizes[s.title] { store.usage[s.id] = fake(v.0, v.1) } }
         let ago = { (m: Double) in ISO8601DateFormatter().string(from: Date().addingTimeInterval(-m * 60)) }
         store.conductorStatus = ["ops": ConductorStatus(
             name: "ops", agent: "claude", session_id: "demo-0", running: true, heartbeat: true,

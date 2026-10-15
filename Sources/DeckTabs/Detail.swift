@@ -79,6 +79,10 @@ struct DetailHeader: View {
                         }
                         .help(String(localized: "Git branch"))
                     }
+                    if let u = store.usage(of: session) {
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                        TokenLabel(usage: u)
+                    }
                     Text(verbatim: "·").foregroundStyle(.tertiary)
                     Text(session.shortPath)
                         .font(.system(size: 11, design: .monospaced))

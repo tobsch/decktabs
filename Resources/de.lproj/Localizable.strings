@@ -150,3 +150,13 @@
 "Restart session" = "Session neu starten";
 "Start Session" = "Session starten";
 "Could not start “%@”" = "„%@“ ließ sich nicht starten";
+
+/* Tokens */
+"Output: %@" = "Ausgabe: %@";
+"Input: %@" = "Eingabe: %@";
+"Cache written: %@" = "Cache geschrieben: %@";
+"Cache read: %@" = "Cache gelesen: %@";
+"tokens" = "Tokens";
+"Tokens" = "Tokens";
+"in total" = "gesamt";
+"%lld roles" = "%lld Rollen";
