@@ -16,7 +16,9 @@ struct DetailView: View {
                     DetailHeader(session: s, unread: store.isUnread(s), sidebarHidden: sidebarHidden, toggleSidebar: toggleSidebar)
                     Rectangle().fill(Theme.canvasLine).frame(height: 1)
                     HStack(spacing: 0) {
-                        if pool.failed.contains(s.id) {
+                        if s.isStopped {
+                            NotRunning(session: s)
+                        } else if pool.failed.contains(s.id) {
                             Disconnected(session: s)
                         } else {
                             TerminalContainer(session: s, revision: pool.revision)
@@ -97,6 +99,12 @@ struct DetailHeader: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(session.attachHint, forType: .string)
                 }
+                if !session.isRemote {
+                    HeaderButton(symbol: session.isStopped ? "play" : "arrow.counterclockwise.circle",
+                                 help: session.isStopped ? String(localized: "Start session") : String(localized: "Restart session")) {
+                        store.start(session)
+                    }
+                }
                 HeaderButton(symbol: "arrow.clockwise", help: String(localized: "Reconnect terminal")) {
                     TerminalPool.shared.reconnect(session.id)
                 }
@@ -161,6 +169,7 @@ struct HeaderButton: View {
 }
 
 struct Disconnected: View {
+    @EnvironmentObject var store: SessionStore
     let session: DeckSession
 
     var body: some View {
@@ -169,9 +178,16 @@ struct Disconnected: View {
                        text: session.isRemote
                            ? String(localized: "“\(session.title)” on \(session.remote ?? "") is not reachable right now. Is the machine on?")
                            : String(localized: "tmux session “\(session.tmux_session ?? session.title)” is not reachable right now. Is it still running?"))
-            Button("Reconnect") { TerminalPool.shared.reconnect(session.id) }
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
+            HStack(spacing: 10) {
+                Button("Reconnect") { TerminalPool.shared.reconnect(session.id) }
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                if !session.isRemote {
+                    Button("Start Session") { store.start(session) }
+                        .controlSize(.large)
+                        .disabled(store.starting.contains(session.id))
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

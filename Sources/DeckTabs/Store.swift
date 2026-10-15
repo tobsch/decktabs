@@ -131,6 +131,8 @@ final class SessionStore: ObservableObject {
         didSet { if let selectedID { markSeen(selectedID) } }
     }
     @Published var lastError: String?
+    /// Sessions with a start or restart in flight.
+    @Published var starting: Set<String> = []
     @Published var loaded = false
     @Published var mode: SidebarMode {
         didSet { UserDefaults.standard.set(mode.rawValue, forKey: "sidebarMode") }

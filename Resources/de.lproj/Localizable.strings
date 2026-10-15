@@ -138,3 +138,15 @@
 "Mark as read" = "Als gelesen markieren";
 "Your answer…" = "Deine Antwort …";
 "Open “%@”" = "„%@“ öffnen";
+
+/* Starting sessions */
+"Session Ended With an Error" = "Session mit Fehler beendet";
+"Session Stopped" = "Session gestoppt";
+"The agent in “%@” exited. Restart it to pick up where the conversation left off." = "Der Agent in „%@“ wurde beendet. Starte ihn neu, um dort weiterzumachen, wo das Gespräch aufgehört hat.";
+"“%@” is not running. Start it to continue." = "„%@“ läuft gerade nicht. Starte die Session, um weiterzumachen.";
+"Start" = "Starten";
+"Remote sessions are started on their machine." = "Remote-Sessions startest du auf ihrem Rechner.";
+"Start session" = "Session starten";
+"Restart session" = "Session neu starten";
+"Start Session" = "Session starten";
+"Could not start “%@”" = "„%@“ ließ sich nicht starten";

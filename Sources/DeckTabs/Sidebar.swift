@@ -108,6 +108,10 @@ struct Sidebar: View {
 
     @ViewBuilder
     private func sessionMenu(_ s: DeckSession) -> some View {
+        if !s.isRemote {
+            Button(s.isStopped ? "Start" : "Restart") { store.start(s) }
+            Divider()
+        }
         if !s.isRemote && !store.conductors.isEmpty {
             let current = store.conductorAncestor(of: s)
             Menu("Conductor") {
@@ -126,7 +130,7 @@ struct Sidebar: View {
     private func conductorMenu(_ c: DeckSession) -> some View {
         Button("Configure…") { configuring = c }
             .disabled(c.isRemote)
-        Button("Restart") { store.restartConductor(c) }
+        Button(c.isStopped ? "Start" : "Restart") { store.start(c) }
             .disabled(c.isRemote)
         Divider()
         Button("New Conductor…") { creatingConductor = true }
