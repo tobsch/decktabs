@@ -42,7 +42,7 @@ struct Sidebar: View {
                     Section {
                             ForEach(store.conductors) { c in
                                 rows([c], now: ctx.date, showGroup: true, conductorFold: store.collapsedConductors.contains(c.id))
-                                if store.mode == .activity && !store.collapsedConductors.contains(c.id) {
+                                if !store.collapsedConductors.contains(c.id) {
                                     workerRows(c, now: ctx.date)
                                 }
                             }

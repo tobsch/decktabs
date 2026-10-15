@@ -203,7 +203,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var knownGroups: [String] = []
 
     var groups: [(name: String, sessions: [DeckSession], isRemote: Bool)] {
-        var byArea = Dictionary(grouping: sessions.filter { !isConductor($0) }, by: \.area)
+        var byArea = Dictionary(grouping: others, by: \.area)
         for g in knownGroups where byArea[g] == nil && !g.lowercased().hasPrefix("conductor") { byArea[g] = [] }
         return byArea
             .map { (name: $0.key, sessions: $0.value, isRemote: $0.value.first?.isRemote ?? false) }
@@ -243,7 +243,7 @@ final class SessionStore: ObservableObject {
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
         let top = conductors.flatMap { [$0] + (collapsedConductors.contains($0.id) ? [] : children(of: $0)) }
-        return mode == .activity ? top + others : conductors + groups.flatMap(\.sessions)
+        return top + (mode == .activity ? others : groups.flatMap(\.sessions))
     }
 
     var unreadCount: Int { sessions.filter(isUnread).count }
