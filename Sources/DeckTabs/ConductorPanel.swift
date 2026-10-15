@@ -381,9 +381,22 @@ private struct TokenSummary: View {
     var body: some View {
         let (own, workers) = store.conductorUsage(conductor)
         let tasks = store.taskUsage(conductor).filter { $0.roles > 1 }
-        if (own + workers).total > 0 {
+        let since = store.usageSince(conductor)
+        if (own + workers).total > 0 || since != nil {
             PanelSection(title: String(localized: "Tokens"), count: 0) {
                 VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text(since.map { String(localized: "since \($0.formatted(date: .abbreviated, time: .shortened))") }
+                             ?? String(localized: "whole conversations"))
+                        Spacer(minLength: 4)
+                        Button(String(localized: "Reset")) {
+                            store.resetUsage([conductor] + store.children(of: conductor))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.accentColor)
+                        .help(String(localized: "Count from zero for the conductor and its workers"))
+                    }
+                    .font(.system(size: 11)).foregroundStyle(.tertiary)
                     HStack(alignment: .firstTextBaseline) {
                         Text(verbatim: TokenUsage.format((own + workers).total))
                             .font(.system(size: 20, weight: .semibold).monospacedDigit())

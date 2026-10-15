@@ -112,6 +112,8 @@ struct Sidebar: View {
             Button(s.isStopped ? "Start" : "Restart") { store.start(s) }
             Divider()
         }
+        Button("Reset Token Counter") { store.resetUsage([s]) }
+            .disabled(store.usage(of: s) == nil)
         if !s.isRemote && !store.conductors.isEmpty {
             let current = store.conductorAncestor(of: s)
             Menu("Conductor") {
@@ -132,6 +134,7 @@ struct Sidebar: View {
             .disabled(c.isRemote)
         Button(c.isStopped ? "Start" : "Restart") { store.start(c) }
             .disabled(c.isRemote)
+        Button("Reset Token Counter") { store.resetUsage([c] + store.children(of: c)) }
         Divider()
         Button("New Conductor…") { creatingConductor = true }
     }

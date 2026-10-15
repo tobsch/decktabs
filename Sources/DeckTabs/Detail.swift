@@ -81,7 +81,7 @@ struct DetailHeader: View {
                     }
                     if let u = store.usage(of: session) {
                         Text(verbatim: "·").foregroundStyle(.tertiary)
-                        TokenLabel(usage: u)
+                        TokenLabel(usage: u, since: store.usageSince(session))
                     }
                     Text(verbatim: "·").foregroundStyle(.tertiary)
                     Text(session.shortPath)

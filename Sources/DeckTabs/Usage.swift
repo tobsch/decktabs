@@ -44,16 +44,36 @@ struct TokenUsage: Codable, Equatable {
     }
 }
 
+struct TokenReset: Codable, Equatable {
+    var baseline: TokenUsage
+    var date: Date
+}
+
 /// Role sessions are titled "<role>-<task>"; everything a pipeline spends on one task shares the suffix.
 private let rolePrefix = try! Regex(#"^(builder|reviewer|security|ux|qa|screener)-(.+)$"#)
 
 extension SessionStore {
-    func usage(of s: DeckSession) -> TokenUsage? { usage[s.id] }
+    /// Tokens since the last reset of this session's counter (or since the conversation started).
+    func usage(of s: DeckSession) -> TokenUsage? {
+        guard let raw = usage[s.id] else { return nil }
+        // A new conversation starts below the old baseline: count it from zero again.
+        guard let base = tokenResets[s.id]?.baseline, base.total <= raw.total else { return raw }
+        let u = raw - base
+        return u.total > 0 ? u : nil
+    }
+
+    /// When the counter of a session was last reset, if ever.
+    func usageSince(_ s: DeckSession) -> Date? { tokenResets[s.id]?.date }
+
+    /// Starts counting from zero for these sessions (a conductor passes itself and its workers).
+    func resetUsage(_ list: [DeckSession]) {
+        for s in list { tokenResets[s.id] = TokenReset(baseline: usage[s.id] ?? TokenUsage(), date: Date()) }
+    }
 
     /// A conductor plus everything it started.
     func conductorUsage(_ c: DeckSession) -> (own: TokenUsage, workers: TokenUsage) {
-        let own = usage[c.id] ?? TokenUsage()
-        let workers = children(of: c).compactMap { usage[$0.id] }.reduce(TokenUsage(), +)
+        let own = usage(of: c) ?? TokenUsage()
+        let workers = children(of: c).compactMap { usage(of: $0) }.reduce(TokenUsage(), +)
         return (own, workers)
     }
 
@@ -61,7 +81,7 @@ extension SessionStore {
     func taskUsage(_ c: DeckSession) -> [(task: String, roles: Int, usage: TokenUsage)] {
         var groups: [String: (Int, TokenUsage)] = [:]
         for w in children(of: c) {
-            guard let u = usage[w.id] else { continue }
+            guard let u = usage(of: w) else { continue }
             let task = (try? rolePrefix.wholeMatch(in: w.title)).flatMap { $0.output[2].substring.map(String.init) } ?? w.title
             let g = groups[task] ?? (0, TokenUsage())
             groups[task] = (g.0 + 1, g.1 + u)
@@ -163,6 +183,7 @@ actor TranscriptScanner {
 struct TokenLabel: View {
     let usage: TokenUsage
     var suffix = true
+    var since: Date? = nil
 
     var body: some View {
         HStack(spacing: 3) {
@@ -170,6 +191,6 @@ struct TokenLabel: View {
             Text(verbatim: TokenUsage.format(usage.total) + (suffix ? " " + String(localized: "tokens") : ""))
                 .monospacedDigit()
         }
-        .help(usage.breakdown)
+        .help((since.map { String(localized: "since \($0.formatted(date: .abbreviated, time: .shortened))") + "\n" } ?? "") + usage.breakdown)
     }
 }

@@ -135,6 +135,11 @@ final class SessionStore: ObservableObject {
     @Published var lastError: String?
     /// Tokens per session id (from `agent-deck costs`).
     @Published var usage: [String: TokenUsage] = [:]
+    /// Per-session counter resets ("count from here"), kept across launches.
+    @Published var tokenResets: [String: TokenReset] = (UserDefaults.standard.data(forKey: "tokenResets"))
+        .flatMap { try? JSONDecoder().decode([String: TokenReset].self, from: $0) } ?? [:] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(tokenResets), forKey: "tokenResets") }
+    }
     private var usageTimer: Timer?
     /// Sessions with a start or restart in flight.
     @Published var starting: Set<String> = []
