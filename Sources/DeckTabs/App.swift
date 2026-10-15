@@ -23,6 +23,18 @@ struct DeckTabsApp: App {
         .defaultSize(width: 1280, height: 820)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // Replaces the standard Find items: those would only search the visible screen.
+            CommandGroup(replacing: .textEditing) {
+                Button("Find…") { TerminalFind.shared.open() }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(!(store.selected.map(TerminalFind.canSearch) ?? false))
+                Button("Find Next") { if let s = store.selected { TerminalFind.shared.step(s, older: true) } }
+                    .keyboardShortcut("g", modifiers: .command)
+                    .disabled(!TerminalFind.shared.visible)
+                Button("Find Previous") { if let s = store.selected { TerminalFind.shared.step(s, older: false) } }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .disabled(!TerminalFind.shared.visible)
+            }
             CommandMenu("Session") {
                 Button("Jump to…") { withAnimation(.easeOut(duration: 0.15)) { showSwitcher = true } }
                     .keyboardShortcut("k", modifiers: .command)

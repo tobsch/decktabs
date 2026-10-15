@@ -34,6 +34,11 @@ final class TerminalPool: NSObject, ObservableObject, LocalProcessTerminalViewDe
         return v
     }
 
+    func focus(_ id: String) {
+        guard let v = views[id] else { return }
+        v.window?.makeFirstResponder(v)
+    }
+
     func reconnect(_ id: String) {
         failed.remove(id)
         views[id]?.process.terminate()
@@ -95,6 +100,9 @@ struct TerminalContainer: NSViewRepresentable {
                 term.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -4),
             ])
         }
-        DispatchQueue.main.async { term.window?.makeFirstResponder(term) }
+        // The find bar keeps the keyboard while it is open.
+        if !TerminalFind.shared.visible {
+            DispatchQueue.main.async { term.window?.makeFirstResponder(term) }
+        }
     }
 }

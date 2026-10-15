@@ -132,7 +132,13 @@ enum SidebarMode: String, CaseIterable {
 final class SessionStore: ObservableObject {
     @Published var sessions: [DeckSession] = []
     @Published var selectedID: String? {
-        didSet { if let selectedID { markSeen(selectedID) } }
+        didSet {
+            if let selectedID { markSeen(selectedID) }
+            // Switching sessions ends a search in the old one (it would stay scrolled up in copy mode).
+            if oldValue != selectedID, TerminalFind.shared.visible {
+                TerminalFind.shared.close(sessions.first { $0.id == oldValue })
+            }
+        }
     }
     @Published var lastError: String?
     /// Tokens per session id (from `agent-deck costs`).
@@ -166,7 +172,7 @@ final class SessionStore: ObservableObject {
     }
 
     var conductors: [DeckSession] { sessions.filter(isConductor) }
-    /// Sessions in the time buckets: everything except conductors and the workers nested under them.
+    /// Sessions in the time buckets: everything except conductors and their workers (those live in the conductor panel).
     var others: [DeckSession] { sessions.filter { !isConductor($0) && conductorAncestor(of: $0) == nil } }
 
     // Conductor state (see Conductor.swift)
@@ -175,13 +181,6 @@ final class SessionStore: ObservableObject {
     var notifiedOutbox: Set<String> = []
     var outboxPrimed = false
     weak static var current: SessionStore?
-    /// Conductors whose finished tasks are unfolded in the sidebar.
-    @Published var showDone: Set<String> = []
-    /// Conductors whose workers are folded away in the sidebar.
-    @Published var collapsedConductors: Set<String> =
-        Set(UserDefaults.standard.stringArray(forKey: "collapsedConductors") ?? []) {
-        didSet { UserDefaults.standard.set(Array(collapsedConductors), forKey: "collapsedConductors") }
-    }
 
     /// Current git branch per local session (refreshed every 10 s).
     @Published private(set) var branches: [String: String] = [:]
@@ -206,7 +205,9 @@ final class SessionStore: ObservableObject {
 
     var groups: [(name: String, sessions: [DeckSession], isRemote: Bool)] {
         var byArea = Dictionary(grouping: others, by: \.area)
-        for g in knownGroups where byArea[g] == nil && !g.lowercased().hasPrefix("conductor") { byArea[g] = [] }
+        // Empty groups stay visible as drop targets; groups that only hold conductor workers do not.
+        for g in knownGroups where byArea[g] == nil && !g.lowercased().hasPrefix("conductor")
+            && !sessions.contains(where: { $0.group == g }) { byArea[g] = [] }
         return byArea
             .map { (name: $0.key, sessions: $0.value, isRemote: $0.value.first?.isRemote ?? false) }
             .sorted {
@@ -244,8 +245,7 @@ final class SessionStore: ObservableObject {
 
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
-        let top = conductors.flatMap { [$0] + (collapsedConductors.contains($0.id) ? [] : visibleWorkers(of: $0)) }
-        return top + (mode == .activity ? others : groups.flatMap(\.sessions))
+        return conductors + (mode == .activity ? others : groups.flatMap(\.sessions))
     }
 
     var unreadCount: Int { sessions.filter(isUnread).count }

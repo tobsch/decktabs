@@ -169,3 +169,15 @@
 "In progress" = "In Arbeit";
 "Other" = "Weitere";
 "Task" = "Task";
+"Nothing in progress" = "Nichts in Arbeit";
+"%lld tasks in progress" = "%lld Tasks in Arbeit";
+"%lld finished tasks" = "%lld erledigte Tasks";
+"Find…" = "Suchen …";
+"Find Next" = "Weitersuchen";
+"Find Previous" = "Rückwärts suchen";
+"Search history" = "Verlauf durchsuchen";
+"no hits" = "keine Treffer";
+"%lld hits" = "%lld Treffer";
+"Older hit (Enter, ⌘G)" = "Älterer Treffer (Enter, ⌘G)";
+"Newer hit (⇧⌘G)" = "Neuerer Treffer (⇧⌘G)";
+"Close (Esc)" = "Schließen (Esc)";

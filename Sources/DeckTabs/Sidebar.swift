@@ -41,10 +41,7 @@ struct Sidebar: View {
                 List(selection: $store.selectedID) {
                     Section {
                             ForEach(store.conductors) { c in
-                                rows([c], now: ctx.date, showGroup: true, conductorFold: store.collapsedConductors.contains(c.id))
-                                if !store.collapsedConductors.contains(c.id) {
-                                    workerRows(c, now: ctx.date)
-                                }
+                                rows([c], now: ctx.date, showGroup: true)
                             }
                     } header: {
                             HStack {
@@ -139,55 +136,8 @@ struct Sidebar: View {
         Button("New Conductor…") { creatingConductor = true }
     }
 
-    /// A conductor's workers as a funnel: one row per running task with its stages as chips, then the
-    /// sessions without a task, then finished tasks folded under "Done".
     @ViewBuilder
-    private func workerRows(_ c: DeckSession, now: Date) -> some View {
-        let units = store.workUnits(of: c)
-        let tasks = units.filter { $0.task != nil && $0.isActive }
-        let loose = units.filter { $0.task == nil }
-        let done = units.filter { $0.task != nil && !$0.isActive }
-        if !tasks.isEmpty {
-            WorkerCaption(text: String(localized: "In progress"), strong: true)
-            ForEach(tasks) { u in taskRow(u, now: now) }
-        }
-        if !loose.isEmpty {
-            if !tasks.isEmpty || !done.isEmpty { WorkerCaption(text: String(localized: "Other"), strong: true) }
-            rows(loose.flatMap(\.sessions), now: now, showGroup: true, nested: true)
-        }
-        if !done.isEmpty {
-            let open = store.showDone.contains(c.id)
-            Button {
-                withAnimation(.snappy(duration: 0.2)) {
-                    if open { store.showDone.remove(c.id) } else { store.showDone.insert(c.id) }
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    WorkerCaption(text: String(localized: "Done") + " (\(done.count))", strong: true)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .bold)).foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(open ? 90 : 0)).padding(.top, 4)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .selectionDisabled()
-            if open { ForEach(done) { u in taskRow(u, now: now) } }
-        }
-    }
-
-    private func taskRow(_ u: WorkUnit, now: Date) -> some View {
-        TaskRow(unit: u, selectedID: store.selectedID, now: now,
-                shortcut: keys.commandHeld ? store.ordered.firstIndex(of: u.current).flatMap { $0 < 9 ? $0 + 1 : nil } : nil) { s in
-            store.selectedID = s.id
-        }
-        .contextMenu { sessionMenu(u.current) }
-        .tag(u.current.id)
-    }
-
-    @ViewBuilder
-    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil,
-                      nested: Bool = false, conductorFold: Bool? = nil, roleOnly: Bool = false) -> some View {
+    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil) -> some View {
         ForEach(list) { s in
             let inbox = store.pendingOutbox(s)
             SessionRow(
@@ -198,11 +148,7 @@ struct Sidebar: View {
                 now: now,
                 inboxCount: inbox.count,
                 inboxUrgent: inbox.contains(where: \.isUrgent),
-                nested: nested,
-                label: roleOnly ? store.taskName(of: s).map { String(s.title.dropLast($0.count + 1)) } : nil,
-                fold: conductorFold.map { collapsed in
-                    FoldState(collapsed: collapsed, count: store.children(of: s).count) { store.toggleCollapsed(s) }
-                }
+                subtitle: store.isConductor(s) ? store.workSummary(of: s) : nil
             )
             .contextMenu { if store.isConductor(s) { conductorMenu(s) } else { sessionMenu(s) } }
             .tag(s.id)
@@ -246,90 +192,6 @@ struct Sidebar: View {
     }
 }
 
-/// One task under a conductor: its name, and its stages (builder, then the checks) as chips.
-/// The row opens the session working right now; a chip opens that stage.
-struct TaskRow: View {
-    let unit: WorkUnit
-    let selectedID: String?
-    let now: Date
-    let shortcut: Int?
-    let select: (DeckSession) -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Rectangle().fill(Color.secondary.opacity(0.25)).frame(width: 1).padding(.leading, 6)
-            StatusGlyph(session: unit.current, unread: false)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(unit.displayName)
-                    .font(.system(size: 13))
-                    .lineLimit(1)
-                HStack(spacing: 3) {
-                    ForEach(unit.sessions) { s in chip(s) }
-                }
-            }
-            Spacer(minLength: 4)
-            if let shortcut {
-                Text(verbatim: "⌘\(shortcut)")
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
-            } else {
-                Text(Theme.ago(unit.lastActivity, now: now))
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 3)
-        // A chip may have opened another stage than the row's own session: still mark the task.
-        .background(alignment: .center) {
-            if let selectedID, selectedID != unit.current.id, unit.sessions.contains(where: { $0.id == selectedID }) {
-                RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.07)).padding(.horizontal, -6)
-            }
-        }
-        .help(unit.task ?? "")
-    }
-
-    private func role(_ s: DeckSession) -> String {
-        guard let task = unit.task, s.title.hasSuffix("-" + task) else { return s.title }
-        return String(s.title.dropLast(task.count + 1))
-    }
-
-    private func chip(_ s: DeckSession) -> some View {
-        let selected = s.id == selectedID
-        let tint: Color = s.isError ? .red : s.isRunning ? .accentColor : s.isStopped ? .secondary : .orange
-        return Button { select(s) } label: {
-            HStack(spacing: 3) {
-                Circle().fill(tint.opacity(s.isStopped ? 0.4 : 1)).frame(width: 5, height: 5)
-                Text(role(s))
-            }
-            .font(.system(size: 10, weight: selected ? .semibold : .regular))
-            .foregroundStyle(s.isStopped ? .tertiary : .secondary)
-            .padding(.horizontal, 5).padding(.vertical, 1.5)
-            .background(Capsule().fill(Color.primary.opacity(selected ? 0.14 : 0.06)))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(role(s) + ": " + statusText(s, unread: false))
-    }
-}
-
-/// Caption between a conductor's workers: a task name, or "Done" above finished work.
-struct WorkerCaption: View {
-    let text: String
-    let strong: Bool
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 10.5, weight: strong ? .semibold : .medium))
-            .foregroundStyle(strong ? .secondary : .tertiary)
-            .textCase(strong ? .uppercase : nil)
-            .lineLimit(1)
-            .padding(.leading, 13)
-            .padding(.top, 4)
-            .selectionDisabled()
-    }
-}
-
 struct SectionTitle: View {
     let text: String
     var symbol: String?
@@ -359,23 +221,20 @@ struct SessionRow: View {
     let now: Date
     var inboxCount = 0
     var inboxUrgent = false
-    /// Worker of a conductor: indented under it with a tree line.
-    var nested = false
-    /// Shorter title, e.g. just the role when a task caption sits above the row.
-    var label: String? = nil
-    /// Conductor row: disclosure chevron to fold its workers.
-    var fold: FoldState? = nil
+    /// Replaces the tool/group line, e.g. what a conductor's workers are doing.
+    var subtitle: String? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            if nested {
-                Rectangle().fill(Color.secondary.opacity(0.25)).frame(width: 1).padding(.leading, 6)
-            }
             StatusGlyph(session: session, unread: unread)
             VStack(alignment: .leading, spacing: 2) {
-                Text(label ?? session.title)
+                Text(session.title)
                     .font(.system(size: 13, weight: unread ? .semibold : .regular))
                     .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                } else {
                 HStack(spacing: 5) {
                     ToolBadge(tool: session.tool)
                     Text(verbatim: "·").foregroundStyle(.tertiary)
@@ -392,25 +251,9 @@ struct SessionRow: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                }
             }
             Spacer(minLength: 4)
-            if let fold, fold.count > 0 {
-                Button(action: fold.toggle) {
-                    HStack(spacing: 3) {
-                        if fold.collapsed {
-                            Text(verbatim: "\(fold.count)").font(.system(size: 10.5, weight: .medium).monospacedDigit())
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .rotationEffect(.degrees(fold.collapsed ? 0 : 90))
-                    }
-                    .foregroundStyle(.secondary)
-                    .frame(minWidth: 18, minHeight: 18)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(fold.collapsed ? String(localized: "Show workers") : String(localized: "Hide workers"))
-            }
             if inboxCount > 0 {
                 Text(verbatim: "\(inboxCount)")
                     .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
@@ -436,12 +279,6 @@ struct SessionRow: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
     }
-}
-
-struct FoldState {
-    let collapsed: Bool
-    let count: Int
-    let toggle: () -> Void
 }
 
 struct SearchButton: View {

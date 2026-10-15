@@ -4,6 +4,7 @@ import SwiftUI
 struct DetailView: View {
     @EnvironmentObject var store: SessionStore
     @ObservedObject var pool = TerminalPool.shared
+    @ObservedObject var find = TerminalFind.shared
     var sidebarHidden = false
     var toggleSidebar: () -> Void = {}
     @AppStorage("conductorPanel") private var showPanel = true
@@ -22,6 +23,9 @@ struct DetailView: View {
                             Disconnected(session: s)
                         } else {
                             TerminalContainer(session: s, revision: pool.revision)
+                                .overlay(alignment: .topTrailing) {
+                                    if find.visible { FindBar(session: s) }
+                                }
                         }
                         if store.isConductor(s) && showPanel {
                             Rectangle().fill(Theme.canvasLine).frame(width: 1)

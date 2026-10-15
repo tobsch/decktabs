@@ -49,14 +49,14 @@ extension SessionStore {
         workUnits(of: conductor).flatMap(\.sessions)
     }
 
-    /// What the sidebar shows for a conductor: one entry per task (its current session), then sessions
-    /// without a task, finished tasks only when unfolded. Drives ⌘1–9.
-    func visibleWorkers(of conductor: DeckSession) -> [DeckSession] {
-        let units = workUnits(of: conductor)
-        let tasks = units.filter { $0.task != nil && $0.isActive }.map(\.current)
-        let loose = units.filter { $0.task == nil }.flatMap(\.sessions)
-        let done = showDone.contains(conductor.id) ? units.filter { $0.task != nil && !$0.isActive }.map(\.current) : []
-        return tasks + loose + done
+    /// One line for the sidebar: what the conductor's workers are on right now.
+    func workSummary(of conductor: DeckSession) -> String {
+        let busy = workUnits(of: conductor).filter { $0.task != nil && $0.isActive }
+        switch busy.count {
+        case 0: return String(localized: "Nothing in progress")
+        case 1: return busy[0].displayName + " · " + busy[0].stage
+        default: return String(localized: "\(busy.count) tasks in progress")
+        }
     }
 
     /// A conductor's workers ordered by flow instead of last activity: sessions of one task
@@ -147,13 +147,6 @@ extension SessionStore {
 
     // MARK: Actions
 
-    func toggleCollapsed(_ c: DeckSession) {
-        withAnimation(.snappy(duration: 0.25)) {
-            if collapsedConductors.contains(c.id) { collapsedConductors.remove(c.id) }
-            else { collapsedConductors.insert(c.id) }
-        }
-    }
-
     /// Hands a session to a conductor (`session set-parent`) or detaches it (`unset-parent`).
     func assign(_ s: DeckSession, to conductor: DeckSession?) {
         guard !s.isRemote else { return }
@@ -231,6 +224,11 @@ struct WorkUnit: Identifiable {
     /// The session to open for the whole task: the one working now, else the newest that waits.
     var current: DeckSession {
         sessions.last(where: \.isRunning) ?? sessions.last(where: { !$0.isStopped }) ?? sessions.last!
+    }
+    /// The role of the current session ("builder", "qa"), i.e. how far the task got.
+    var stage: String {
+        guard let task, current.title.hasSuffix("-" + task) else { return current.title }
+        return String(current.title.dropLast(task.count + 1))
     }
     /// "keep-role-sessions" → "Keep role sessions"; board ids are shortened.
     var displayName: String {

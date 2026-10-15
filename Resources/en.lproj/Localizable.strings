@@ -3,3 +3,6 @@
 "In progress" = "In progress";
 "Other" = "Other";
 "Task" = "Task";
+"Nothing in progress" = "Nothing in progress";
+"%lld tasks in progress" = "%lld tasks in progress";
+"%lld finished tasks" = "%lld finished tasks";
