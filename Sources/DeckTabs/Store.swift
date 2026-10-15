@@ -12,6 +12,7 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
     let path: String
     let tmux_session: String?
     let last_activity_at: String?
+    let created_at: String?
     let archived: Bool?
     let parent_session_id: String?
     /// Set by agent-deck for conductor sessions (only present when true).
@@ -42,6 +43,7 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
     }
 
     var lastActivity: Date { Self.parseDate(last_activity_at) ?? .distantPast }
+    var created: Date { Self.parseDate(created_at) ?? lastActivity }
 
     /// agent-deck conductors live in a "conductor" group or are titled "conductor-…".
     var isConductor: Bool {

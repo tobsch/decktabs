@@ -43,7 +43,7 @@ struct Sidebar: View {
                             ForEach(store.conductors) { c in
                                 rows([c], now: ctx.date, showGroup: true, conductorFold: store.collapsedConductors.contains(c.id))
                                 if store.mode == .activity && !store.collapsedConductors.contains(c.id) {
-                                    rows(store.children(of: c), now: ctx.date, showGroup: true, nested: true)
+                                    workerRows(c, now: ctx.date)
                                 }
                             }
                     } header: {
@@ -139,9 +139,22 @@ struct Sidebar: View {
         Button("New Conductor…") { creatingConductor = true }
     }
 
+    /// A conductor's workers by flow: one caption per task with its roles in start order,
+    /// finished units below an "Erledigt" caption.
+    @ViewBuilder
+    private func workerRows(_ c: DeckSession, now: Date) -> some View {
+        let units = store.workUnits(of: c)
+        let firstDone = units.firstIndex { !$0.isActive }
+        ForEach(Array(units.enumerated()), id: \.element.id) { i, u in
+            if i == firstDone, i > 0 { WorkerCaption(text: String(localized: "Done"), strong: true) }
+            if let task = u.task { WorkerCaption(text: task, strong: false) }
+            rows(u.sessions, now: now, showGroup: u.task == nil, nested: true, roleOnly: u.task != nil)
+        }
+    }
+
     @ViewBuilder
     private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil,
-                      nested: Bool = false, conductorFold: Bool? = nil) -> some View {
+                      nested: Bool = false, conductorFold: Bool? = nil, roleOnly: Bool = false) -> some View {
         ForEach(list) { s in
             let inbox = store.pendingOutbox(s)
             SessionRow(
@@ -153,6 +166,7 @@ struct Sidebar: View {
                 inboxCount: inbox.count,
                 inboxUrgent: inbox.contains(where: \.isUrgent),
                 nested: nested,
+                label: roleOnly ? store.taskName(of: s).map { String(s.title.dropLast($0.count + 1)) } : nil,
                 fold: conductorFold.map { collapsed in
                     FoldState(collapsed: collapsed, count: store.children(of: s).count) { store.toggleCollapsed(s) }
                 }
@@ -199,6 +213,23 @@ struct Sidebar: View {
     }
 }
 
+/// Caption between a conductor's workers: a task name, or "Done" above finished work.
+struct WorkerCaption: View {
+    let text: String
+    let strong: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10.5, weight: strong ? .semibold : .medium))
+            .foregroundStyle(strong ? .secondary : .tertiary)
+            .textCase(strong ? .uppercase : nil)
+            .lineLimit(1)
+            .padding(.leading, 13)
+            .padding(.top, 4)
+            .selectionDisabled()
+    }
+}
+
 struct SectionTitle: View {
     let text: String
     var symbol: String?
@@ -230,6 +261,8 @@ struct SessionRow: View {
     var inboxUrgent = false
     /// Worker of a conductor: indented under it with a tree line.
     var nested = false
+    /// Shorter title, e.g. just the role when a task caption sits above the row.
+    var label: String? = nil
     /// Conductor row: disclosure chevron to fold its workers.
     var fold: FoldState? = nil
 
@@ -240,7 +273,7 @@ struct SessionRow: View {
             }
             StatusGlyph(session: session, unread: unread)
             VStack(alignment: .leading, spacing: 2) {
-                Text(session.title)
+                Text(label ?? session.title)
                     .font(.system(size: 13, weight: unread ? .semibold : .regular))
                     .lineLimit(1)
                 HStack(spacing: 5) {

@@ -53,6 +53,13 @@ struct TokenReset: Codable, Equatable {
 private let rolePrefix = try! Regex(#"^(builder|reviewer|security|ux|qa|screener)-(.+)$"#)
 
 extension SessionStore {
+    /// The task a worker belongs to, from titles like "builder-x" or "qa-x".
+    func taskName(of s: DeckSession) -> String? {
+        (try? rolePrefix.wholeMatch(in: s.title)).flatMap { $0.output[2].substring.map(String.init) }
+    }
+}
+
+extension SessionStore {
     /// Tokens since the last reset of this session's counter (or since the conversation started).
     func usage(of s: DeckSession) -> TokenUsage? {
         guard let raw = usage[s.id] else { return nil }
@@ -82,7 +89,7 @@ extension SessionStore {
         var groups: [String: (Int, TokenUsage)] = [:]
         for w in children(of: c) {
             guard let u = usage(of: w) else { continue }
-            let task = (try? rolePrefix.wholeMatch(in: w.title)).flatMap { $0.output[2].substring.map(String.init) } ?? w.title
+            let task = taskName(of: w) ?? w.title
             let g = groups[task] ?? (0, TokenUsage())
             groups[task] = (g.0 + 1, g.1 + u)
         }

@@ -44,9 +44,25 @@ extension SessionStore {
         conductorName(s).flatMap { conductorStatus[$0] }
     }
 
-    /// Sessions a conductor launched (directly or via its workers), newest activity first.
+    /// Sessions a conductor launched (directly or via its workers), in the order of `workUnits`.
     func children(of conductor: DeckSession) -> [DeckSession] {
-        sessions.filter { $0.id != conductor.id && conductorAncestor(of: $0)?.id == conductor.id }
+        workUnits(of: conductor).flatMap(\.sessions)
+    }
+
+    /// A conductor's workers ordered by flow instead of last activity: sessions of one task
+    /// ("builder-x", "qa-x" → "x") stay together in the order they were started, units with a
+    /// live session come first, newest unit first within each half.
+    func workUnits(of conductor: DeckSession) -> [WorkUnit] {
+        let mine = sessions.filter { $0.id != conductor.id && conductorAncestor(of: $0)?.id == conductor.id }
+        var units: [String: [DeckSession]] = [:]
+        for s in mine { units[taskName(of: s).map { "task:\($0)" } ?? "id:\(s.id)", default: []].append(s) }
+        return units.map { key, list in
+            let ordered = list.sorted { ($0.created, $0.title) < ($1.created, $1.title) }
+            return WorkUnit(id: key, task: key.hasPrefix("task:") ? String(key.dropFirst(5)) : nil, sessions: ordered)
+        }
+        .sorted { a, b in
+            a.isActive != b.isActive ? a.isActive : a.started > b.started
+        }
     }
 
     /// The conductor a session descends from via `parent_session_id`, if any.
@@ -192,4 +208,13 @@ final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate {
         }
         completionHandler()
     }
+}
+
+/// One task's sessions under a conductor (or a single session without a task).
+struct WorkUnit: Identifiable {
+    let id: String
+    let task: String?
+    let sessions: [DeckSession]
+    var isActive: Bool { sessions.contains { !$0.isStopped } }
+    var started: Date { sessions.map(\.created).min() ?? .distantPast }
 }
