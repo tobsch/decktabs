@@ -8,7 +8,9 @@ struct TokenUsage: Codable, Equatable {
     var cache_write: Int = 0
     var model: String?
 
-    var total: Int { input_tokens + output_tokens + cache_read + cache_write }
+    /// What the session actually added: cache reads re-count the whole context on every response
+    /// (about 98 % of the raw sum in a long session), so they only show up in the breakdown.
+    var total: Int { input_tokens + output_tokens + cache_write }
 
     static func - (a: TokenUsage, b: TokenUsage) -> TokenUsage {
         TokenUsage(input_tokens: a.input_tokens - b.input_tokens, output_tokens: a.output_tokens - b.output_tokens,
@@ -21,13 +23,13 @@ struct TokenUsage: Codable, Equatable {
                    model: a.model == b.model || b.total == 0 ? a.model : a.total == 0 ? b.model : nil)
     }
 
-    /// Tooltip: where the tokens went. Cache reads dominate long sessions and are cheap.
+    /// Tooltip: where the tokens went. Cache reads are listed but not counted in the total.
     var breakdown: String {
         var lines = [
             String(localized: "Output: \(Self.format(output_tokens))"),
             String(localized: "Input: \(Self.format(input_tokens))"),
             String(localized: "Cache written: \(Self.format(cache_write))"),
-            String(localized: "Cache read: \(Self.format(cache_read))"),
+            String(localized: "Cache read (not counted): \(Self.format(cache_read))"),
         ]
         if let model { lines.append(model) }
         return lines.joined(separator: "\n")

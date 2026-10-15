@@ -155,7 +155,7 @@
 "Output: %@" = "Ausgabe: %@";
 "Input: %@" = "Eingabe: %@";
 "Cache written: %@" = "Cache geschrieben: %@";
-"Cache read: %@" = "Cache gelesen: %@";
+"Cache read (not counted): %@" = "Cache gelesen (nicht mitgezählt): %@";
 "tokens" = "Tokens";
 "Tokens" = "Tokens";
 "in total" = "gesamt";
