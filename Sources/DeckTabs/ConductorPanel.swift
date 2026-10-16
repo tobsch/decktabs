@@ -53,19 +53,20 @@ struct ConductorPanel: View {
                                 .font(.system(size: 12)).foregroundStyle(.tertiary)
                                 .padding(.vertical, 4)
                         } else {
-                            // By task, in flow order (builder, then the checks); finished tasks only counted.
+                            // By task, in flow order (builder, then the checks); only sessions that are still
+                            // current, finished tasks only counted.
                             let units = store.workUnits(of: conductor)
                             let done = units.filter { $0.task != nil && !$0.isActive }.count
                             VStack(alignment: .leading, spacing: 2) {
                                 let tasks = units.filter { $0.task != nil && $0.isActive }
-                                let loose = units.filter { $0.task == nil }
+                                let loose = units.filter { $0.task == nil && $0.isActive }
                                 ForEach(tasks + loose) { u in
                                     if u.task != nil || u.id == loose.first?.id {
                                         Text(u.task != nil ? u.displayName : String(localized: "Other"))
                                             .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                                             .padding(.leading, 8).padding(.top, 8)
                                     }
-                                    ForEach(u.sessions) { w in
+                                    ForEach(u.sessions.filter { !$0.isStopped }) { w in
                                         WorkerRow(session: w, unread: store.isUnread(w),
                                                   label: u.task.map { String(w.title.dropLast($0.count + 1)) })
                                     }

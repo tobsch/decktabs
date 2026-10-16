@@ -267,9 +267,9 @@ final class SessionStore: ObservableObject {
             + (mode == .activity ? others : groups.flatMap(\.sessions))
     }
 
-    /// A conductor's workers that are still current: everything not stopped (errors stay visible).
+    /// A conductor's workers that are still current: stopped or crashed sessions drop out (⌘K still finds them).
     func currentWorkers(of c: DeckSession) -> [DeckSession] {
-        children(of: c).filter { $0.status != "stopped" }
+        children(of: c).filter { !$0.isStopped }
     }
 
     /// Everything ⌘K can jump to: the sidebar order first, then the workers hidden in folded conductors.
