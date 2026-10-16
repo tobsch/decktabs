@@ -62,22 +62,36 @@ struct DeckSession: Decodable, Identifiable, Equatable, Hashable {
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 
+    /// Sorting and the sidebar ask for these dates thousands of times per refresh, so each string
+    /// is parsed once and the formatters are shared (creating one costs more than the parse).
     static func parseDate(_ s: String?) -> Date? {
         guard let s else { return nil }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: s) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: s) { return d }
-        // Go emits nanoseconds, ISO8601DateFormatter only handles milliseconds
-        if let r = s.range(of: #"\.\d+"#, options: .regularExpression) {
+        dateLock.lock(); defer { dateLock.unlock() }
+        if let hit = dateCache[s] { return hit }
+        if dateCache.count > 5000 { dateCache.removeAll() }
+        let d = isoFractional.date(from: s) ?? isoPlain.date(from: s) ?? {
+            // Go emits nanoseconds, ISO8601DateFormatter only handles milliseconds
+            guard let r = s.range(of: #"\.\d+"#, options: .regularExpression) else { return nil }
             var t = s
             t.replaceSubrange(r, with: String(s[r].prefix(4)))
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f.date(from: t)
-        }
-        return nil
+            return isoFractional.date(from: t)
+        }()
+        dateCache[s] = d
+        return d
     }
+
+    nonisolated(unsafe) private static var dateCache: [String: Date?] = [:]
+    private static let dateLock = NSLock()
+    nonisolated(unsafe) private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    nonisolated(unsafe) private static let isoPlain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
 }
 
 enum Tools {
