@@ -42,6 +42,9 @@ struct Sidebar: View {
                     Section {
                             ForEach(store.conductors) { c in
                                 rows([c], now: ctx.date, showGroup: true)
+                                if store.expandedConductors.contains(c.id) {
+                                    rows(store.currentWorkers(of: c), now: ctx.date, showGroup: true, indent: true)
+                                }
                             }
                     } header: {
                             HStack {
@@ -137,9 +140,11 @@ struct Sidebar: View {
     }
 
     @ViewBuilder
-    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil) -> some View {
+    private func rows(_ list: [DeckSession], now: Date, showGroup: Bool, dropGroup: String? = nil,
+                      indent: Bool = false) -> some View {
         ForEach(list) { s in
             let inbox = store.pendingOutbox(s)
+            let isConductor = store.isConductor(s)
             SessionRow(
                 session: s,
                 unread: store.isUnread(s),
@@ -148,12 +153,25 @@ struct Sidebar: View {
                 now: now,
                 inboxCount: inbox.count,
                 inboxUrgent: inbox.contains(where: \.isUrgent),
-                subtitle: store.isConductor(s) ? store.workSummary(of: s) : nil
+                subtitle: isConductor ? store.workSummary(of: s) : nil,
+                disclosure: isConductor ? disclosure(for: s) : nil
             )
+            .padding(.leading, indent ? 16 : 0)
             .contextMenu { if store.isConductor(s) { conductorMenu(s) } else { sessionMenu(s) } }
             .tag(s.id)
             .draggableSession(s, enabled: store.mode == .groups)
             .dropTarget(dropGroup, store: store)
+        }
+    }
+
+    /// Fold/unfold a conductor; nil when it has nothing current to show.
+    private func disclosure(for c: DeckSession) -> SessionRow.Disclosure? {
+        guard !store.currentWorkers(of: c).isEmpty else { return nil }
+        let open = store.expandedConductors.contains(c.id)
+        return .init(open: open) {
+            withAnimation(.snappy(duration: 0.2)) {
+                if open { store.expandedConductors.remove(c.id) } else { store.expandedConductors.insert(c.id) }
+            }
         }
     }
 
@@ -223,10 +241,31 @@ struct SessionRow: View {
     var inboxUrgent = false
     /// Replaces the tool/group line, e.g. what a conductor's workers are doing.
     var subtitle: String? = nil
+    var disclosure: Disclosure? = nil
+
+    struct Disclosure {
+        let open: Bool
+        let toggle: () -> Void
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             StatusGlyph(session: session, unread: unread)
+                .overlay(alignment: .leading) {
+                    if let disclosure {
+                        Button(action: disclosure.toggle) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .bold))
+                                .rotationEffect(.degrees(disclosure.open ? 90 : 0))
+                                .frame(width: 14, height: 22)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .offset(x: -17)
+                        .help(disclosure.open ? String(localized: "Hide workers") : String(localized: "Show current workers"))
+                    }
+                }
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title)
                     .font(.system(size: 13, weight: unread ? .semibold : .regular))

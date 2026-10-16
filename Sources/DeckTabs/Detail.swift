@@ -227,8 +227,12 @@ struct QuickSwitcher: View {
     var matches: [DeckSession] {
         let q = query.lowercased().trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return store.ordered }
-        return store.ordered.filter {
-            $0.title.lowercased().contains(q) || $0.area.lowercased().contains(q) || $0.path.lowercased().contains(q)
+        // "mhw home" finds the session MHW under conductor home: every word has to match somewhere.
+        let words = q.split(separator: " ").map(String.init)
+        return store.searchable.filter { s in
+            let conductor = store.conductorAncestor(of: s).map { store.conductorName($0) ?? $0.title } ?? ""
+            let hay = [s.title, s.area, s.path, conductor].joined(separator: " ").lowercased()
+            return words.allSatisfy(hay.contains)
         }
     }
 
@@ -240,7 +244,7 @@ struct QuickSwitcher: View {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.secondary)
-                    TextField("Session, area or folder", text: $query)
+                    TextField("Session, area, folder or conductor", text: $query)
                         .textFieldStyle(.plain)
                         .font(.system(size: 18))
                         .focused($focused)

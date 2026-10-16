@@ -169,6 +169,10 @@ final class SessionStore: ObservableObject {
     @Published var mode: SidebarMode {
         didSet { UserDefaults.standard.set(mode.rawValue, forKey: "sidebarMode") }
     }
+    /// Conductors unfolded in the sidebar, showing their workers that are still current.
+    @Published var expandedConductors: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "expandedConductors") ?? []) {
+        didSet { if !Demo.enabled { UserDefaults.standard.set(Array(expandedConductors), forKey: "expandedConductors") } }
+    }
     /// When a session was last looked at – drives "new" (like unread in Mail).
     @Published private(set) var lastSeen: [String: Date]
 
@@ -259,7 +263,20 @@ final class SessionStore: ObservableObject {
 
     /// Order as shown in the sidebar (for ⌘1–9 and ⌘[ ⌘]).
     var ordered: [DeckSession] {
-        return conductors + (mode == .activity ? others : groups.flatMap(\.sessions))
+        conductors.flatMap { [$0] + (expandedConductors.contains($0.id) ? currentWorkers(of: $0) : []) }
+            + (mode == .activity ? others : groups.flatMap(\.sessions))
+    }
+
+    /// A conductor's workers that are still current: everything not stopped (errors stay visible).
+    func currentWorkers(of c: DeckSession) -> [DeckSession] {
+        children(of: c).filter { $0.status != "stopped" }
+    }
+
+    /// Everything ⌘K can jump to: the sidebar order first, then the workers hidden in folded conductors.
+    var searchable: [DeckSession] {
+        let shown = ordered
+        let ids = Set(shown.map(\.id))
+        return shown + sessions.filter { !ids.contains($0.id) }
     }
 
     var unreadCount: Int { sessions.filter(isUnread).count }
@@ -289,6 +306,7 @@ final class SessionStore: ObservableObject {
             selectedID = sessions.first { $0.title == Demo.initialSelection }?.id
             loaded = true
             Demo.applyConductors(to: self)
+            if CommandLine.arguments.contains("--demo-expand") { expandedConductors = Set(conductors.map(\.id)) }
             updateBadge()
             branches = Dictionary(uniqueKeysWithValues: sessions.filter { !$0.isRemote }.map { ($0.id, "main") })
             branches[sessions.first { $0.title == "api-gateway" }?.id ?? ""] = "feat/rate-limit"

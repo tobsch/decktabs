@@ -38,7 +38,6 @@
 "“%@” on %@ is not reachable right now. Is the machine on?" = "„%@“ auf %@ ist gerade nicht erreichbar. Ist der Rechner an?";
 "tmux session “%@” is not reachable right now. Is it still running?" = "tmux-Session „%@“ ist gerade nicht erreichbar. Läuft sie noch?";
 "Reconnect" = "Neu verbinden";
-"Session, area or folder" = "Session, Bereich oder Ordner";
 
 /* Status */
 "error" = "Fehler";
@@ -181,3 +180,6 @@
 "Older hit (Enter, ⌘G)" = "Älterer Treffer (Enter, ⌘G)";
 "Newer hit (⇧⌘G)" = "Neuerer Treffer (⇧⌘G)";
 "Close (Esc)" = "Schließen (Esc)";
+"Hide workers" = "Worker ausblenden";
+"Show current workers" = "Aktuelle Worker anzeigen";
+"Session, area, folder or conductor" = "Session, Bereich, Ordner oder Conductor";
