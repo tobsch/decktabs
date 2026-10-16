@@ -250,22 +250,21 @@ struct SessionRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            StatusGlyph(session: session, unread: unread)
-                .overlay(alignment: .leading) {
-                    if let disclosure {
-                        Button(action: disclosure.toggle) {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 9, weight: .bold))
-                                .rotationEffect(.degrees(disclosure.open ? 90 : 0))
-                                .frame(width: 14, height: 22)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                        .offset(x: -17)
-                        .help(disclosure.open ? String(localized: "Hide workers") : String(localized: "Show current workers"))
-                    }
+            if let disclosure {
+                // Inside the row's bounds: an offset button outside them never receives the click.
+                Button(action: disclosure.toggle) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .rotationEffect(.degrees(disclosure.open ? 90 : 0))
+                        .frame(width: 16, height: 28)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .padding(.trailing, -6)
+                .help(disclosure.open ? String(localized: "Hide workers") : String(localized: "Show current workers"))
+            }
+            StatusGlyph(session: session, unread: unread)
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title)
                     .font(.system(size: 13, weight: unread ? .semibold : .regular))
